@@ -55,6 +55,10 @@
   }
 
   /* ---------- the ticket ---------- */
+  .netbadge.live{
+    color:var(--cream);border-color:rgba(181,81,47,.75);
+    background:rgba(181,81,47,.28);
+  }
   .ticket{
     position:relative;background:var(--paper);
     border-radius:3px;overflow:hidden;
@@ -105,6 +109,11 @@
   .row.total dd{font-size:26px;font-weight:600;color:var(--navy)}
   .row.total dd em{font-style:normal;font-size:13px;color:rgba(13,23,38,.5);margin-left:6px}
 
+  .offchain{
+    margin:0;padding:12px 24px 18px;border-top:1px dashed var(--rule);
+    font-family:"IBM Plex Mono",monospace;font-size:10.5px;line-height:1.6;
+    color:rgba(13,23,38,.5);
+  }
   .chip{
     display:inline-block;font-family:"IBM Plex Mono",monospace;font-size:11px;
     letter-spacing:.08em;text-transform:uppercase;padding:3px 8px;border-radius:2px;
@@ -216,11 +225,15 @@
     </div>
 
     <dl class="rows" id="rows">
-      <div class="row"><dt>Status</dt><dd id="statusOut"><span class="chip void">Not loaded</span></dd></div>
-      <div class="row"><dt>Issued</dt><dd id="issuedOut">—</dd></div>
-      <div class="row"><dt>Paid to date</dt><dd id="paidOut">—</dd></div>
-      <div class="row total"><dt>Balance due</dt><dd id="dueOut">—<em id="dueUnit"></em></dd></div>
+      <div class="row"><dt>Invoice Status</dt><dd id="statusOut"><span class="chip void">Not loaded</span></dd></div>
+      <div class="row"><dt>Trans Date</dt><dd id="issuedOut">—</dd></div>
+      <div class="row"><dt>Grand Total</dt><dd id="totalOut">—</dd></div>
+      <div class="row"><dt>Paid to Date</dt><dd id="paidOut">—</dd></div>
+      <div class="row"><dt>Payment Date</dt><dd id="payDateOut">—</dd></div>
+      <div class="row total"><dt>Balance Due</dt><dd id="dueOut">—<em id="dueUnit"></em></dd></div>
     </dl>
+
+    <p class="offchain">Customer, Bill To, Service Address and Description stay in DSM. Only the invoice number and the money move on-chain — anything written here is public permanently.</p>
   </section>
 
   <!-- ================= PAY ================= -->
@@ -242,10 +255,10 @@
   <section class="panel hidden" id="ownerPanel">
     <h2>Issue an invoice</h2>
     <p class="how">Visible because the connected wallet is the contract owner. Creating an invoice costs a few cents of USDC in gas and cannot be edited afterward — void and reissue instead.</p>
-    <label class="field-label" for="newNum">Invoice number</label>
-    <input id="newNum" placeholder="INV-1042" autocomplete="off">
-    <label class="field-label" for="newAmt">Amount due (USDC)</label>
-    <input id="newAmt" placeholder="1250.00" inputmode="decimal" autocomplete="off">
+    <label class="field-label" for="newNum">INVNum</label>
+    <input id="newNum" placeholder="DSM-54" autocomplete="off">
+    <label class="field-label" for="newAmt">Grand Total (USDC)</label>
+    <input id="newAmt" placeholder="2450.00" inputmode="decimal" autocomplete="off">
     <div class="two">
       <button id="createBtn">Create invoice</button>
       <button id="linkBtn" class="ghost">Copy pay link</button>
@@ -257,7 +270,7 @@
   <section class="panel" id="lookupPanel">
     <h2>Look up a different invoice</h2>
     <p class="how">Reads directly from the chain. Anyone can check an invoice's balance; only the payer's wallet can pay it.</p>
-    <input id="lookupNum" placeholder="INV-1042" autocomplete="off">
+    <input id="lookupNum" placeholder="DSM-54" autocomplete="off">
     <button id="lookupBtn" class="ghost">Load invoice</button>
   </section>
 
@@ -269,18 +282,46 @@
 
 <script>
 /* ============================================================
-   CONFIG — set these two before use
-   ============================================================ */
-const CONTRACT = "0xd435e6D506424AdA0A3BBc06e6d3E3Bf5E2C157D"; // MTInvoiceRegistry
-const RPC      = "https://rpc.testnet.arc.io";
-const CHAIN_ID = 5042002;
-const EXPLORER = "https://testnet.arcscan.app";
+   NETWORKS
 
-/* Arc's docs list native USDC as 18 decimals; at least one node provider's
-   docs claim 6. Verify empirically before issuing a real invoice: load a
-   wallet with faucet USDC and check that the balance printed by verifyUnits()
-   in the console matches what the faucet gave you. Flip this if it doesn't. */
-const NATIVE_DECIMALS = 18;
+   Flip ACTIVE to go live. Both configs stay in the file, so testnet
+   remains usable after mainnet launches — append ?net=testnet to any
+   link to force it, which is how you'll test changes without touching
+   real money.
+
+   Decimals live per-network on purpose: Arc's docs say native USDC is
+   18 and confirmed so on testnet, but don't assume mainnet matches
+   until verifyUnits() says so.
+   ============================================================ */
+const NETWORKS = {
+  testnet: {
+    label:    "Arc Testnet",
+    chainId:  5042002,
+    rpc:      "https://rpc.testnet.arc.io",
+    explorer: "https://testnet.arcscan.app",
+    contract: "0xd435e6D506424AdA0A3BBc06e6d3E3Bf5E2C157D",
+    decimals: 18,
+    live:     false
+  },
+  mainnet: {
+    label:    "Arc",
+    chainId:  0,                    // TODO: set at mainnet launch
+    rpc:      "",                   // TODO
+    explorer: "",                   // TODO
+    contract: "",                   // TODO: redeploy, do not reuse testnet address
+    decimals: 18,                   // TODO: verify with verifyUnits() before first invoice
+    live:     true
+  }
+};
+
+const ACTIVE = "testnet";  // <-- the one line that goes to mainnet
+
+const NET = NETWORKS[new URLSearchParams(location.search).get("net")] || NETWORKS[ACTIVE];
+const CONTRACT = NET.contract;
+const RPC      = NET.rpc;
+const CHAIN_ID = NET.chainId;
+const EXPLORER = NET.explorer;
+const NATIVE_DECIMALS = NET.decimals;
 
 const ABI = [
   "function getInvoice(string) view returns (bool exists,bool voided,uint256 amountDue,uint256 amountPaid,uint256 remaining,uint64 createdAt,uint64 settledAt,address lastPayer)",
@@ -293,7 +334,7 @@ const ABI = [
 
 const ARC_PARAMS = {
   chainId: "0x" + CHAIN_ID.toString(16),
-  chainName: "Arc Testnet",
+  chainName: NET.label,
   nativeCurrency: { name: "USDC", symbol: "USDC", decimals: NATIVE_DECIMALS },
   rpcUrls: [RPC],
   blockExplorerUrls: [EXPLORER]
@@ -307,7 +348,18 @@ const fmt = v => Number(ethers.formatUnits(v, NATIVE_DECIMALS))
 let readProvider = new ethers.JsonRpcProvider(RPC);
 let signer = null, current = null, invNum = "";
 
-$("addrOut").textContent = CONTRACT;
+$("addrOut").textContent = CONTRACT || "not deployed";
+$("netBadge").textContent = NET.label + " · " + (CHAIN_ID || "not set");
+if (NET.live) $("netBadge").classList.add("live");
+
+/* Unconfigured network — fail loudly rather than showing an empty ticket */
+if (!CONTRACT || !RPC || !CHAIN_ID) {
+  $("payWhy").textContent = NET.label + " isn't configured yet. Fill in its entry in the NETWORKS block, or append ?net=testnet to this link.";
+  $("payWhy").className = "why warn";
+  $("connectBtn").disabled = true;
+  $("lookupBtn").disabled = true;
+  throw new Error("network " + NET.label + " not configured");
+}
 
 /* --- which invoice? --- */
 invNum = new URLSearchParams(location.search).get("inv") || "";
@@ -345,23 +397,28 @@ function render() {
     $("connectBtn").disabled = true;
     return;
   }
+  const settled = c.settledAt > 0;
+
   $("issuedOut").textContent = new Date(c.createdAt * 1000).toLocaleDateString();
+  $("totalOut").textContent = fmt(c.due) + " USDC";
   $("paidOut").textContent = fmt(c.paid) + " USDC";
+  $("payDateOut").textContent = settled
+    ? new Date(c.settledAt * 1000).toLocaleDateString()
+    : "—";
   $("dueOut").firstChild.nodeValue = fmt(c.remaining);
   $("dueUnit").textContent = " USDC";
 
-  const settled = c.settledAt > 0;
   if (c.voided) {
     $("statusOut").innerHTML = '<span class="chip void">Voided</span>';
     $("payWhy").textContent = "This invoice was voided by Mechanical Temp and can't take payment. Call 313-282-4758 if you were expecting a balance.";
     $("connectBtn").disabled = true;
   } else if (settled) {
-    $("statusOut").innerHTML = '<span class="chip paid">Paid in full</span>';
+    $("statusOut").innerHTML = '<span class="chip paid">Paid</span>';
     $("stamp").classList.add("on");
     $("payWhy").textContent = "Settled " + new Date(c.settledAt * 1000).toLocaleString() + ". Nothing further is owed.";
     $("connectBtn").disabled = true;
   } else if (c.paid > 0n) {
-    $("statusOut").innerHTML = '<span class="chip part">Partially paid</span>';
+    $("statusOut").innerHTML = '<span class="chip part">Partially Paid</span>';
   } else {
     $("statusOut").innerHTML = '<span class="chip open">Open</span>';
   }
