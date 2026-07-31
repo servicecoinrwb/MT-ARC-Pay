@@ -517,8 +517,9 @@ $("createBtn").onclick = async () => {
     const wei = amts.map(a=>ethers.parseUnits(a,DEC));
     const tx = await c.createJob(ref, cust, wei, win);
     b.textContent="Settling…"; await tx.wait();
-    const total = wei.reduce((a,x)=>a+x,0n);
-    $("ownerWhy").innerHTML = "Created "+esc(ref)+" — "+amts.length+" draws, "+fmt(total)+" USDC total. Send the customer: <code>"+location.origin+location.pathname+"?job="+encodeURIComponent(ref)+"</code>";
+    // land on the job itself — the loaded sheet is better confirmation than text
+    location.search = "?job="+encodeURIComponent(ref);
+    return;
   }catch(e){
     $("ownerWhy").textContent = explain(e);
   }finally{ b.disabled=false; b.textContent="Create job"; }
