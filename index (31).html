@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mechanical Temp on Arc</title>
+<meta name="description" content="Stablecoin payment rails, progress-billing escrow, and a revenue-backed vault — built by Mechanical Temp LLC on Arc.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/ethers@6.13.4/dist/ethers.umd.min.js"></script>
+<style>
+  :root{
+    --navy:#16263f; --sky:#6fb7e3; --cream:#f5efe3; --rust:#b5512f;
+    --ink:#0d1726; --rule:rgba(22,38,63,.16); --rule-hard:rgba(22,38,63,.34);
+    --ok:#2f7d4f; --paper:#fbf8f2;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    background:var(--navy);
+    background-image:radial-gradient(1100px 620px at 50% -12%,rgba(111,183,227,.2),transparent 62%);
+    color:var(--cream);font-family:"IBM Plex Sans",system-ui,sans-serif;
+    font-size:16px;line-height:1.55;padding:30px 16px 70px;display:flex;justify-content:center;
+  }
+  .shell{width:100%;max-width:760px}
+
+  .masthead{display:flex;align-items:baseline;justify-content:space-between;gap:16px;margin-bottom:34px;flex-wrap:wrap}
+  .wordmark{font-family:"Space Grotesk",sans-serif;font-weight:700;font-size:20px;letter-spacing:.14em;text-transform:uppercase}
+  .wordmark span{color:var(--sky)}
+  .netbadge{font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--sky);border:1px solid rgba(111,183,227,.42);border-radius:2px;padding:4px 9px}
+
+  /* hero */
+  .hero{margin-bottom:34px}
+  .eyebrow{font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--sky);margin:0 0 14px}
+  h1{font-family:"Space Grotesk",sans-serif;font-weight:700;font-size:clamp(30px,7.5vw,50px);line-height:1.02;letter-spacing:-.02em;margin:0 0 18px}
+  h1 em{font-style:normal;color:var(--sky)}
+  .lede{font-size:17px;color:rgba(245,239,227,.76);max-width:60ch;margin:0}
+  .lede b{color:var(--cream);font-weight:500}
+
+  /* live strip */
+  .strip{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:rgba(111,183,227,.22);
+    border:1px solid rgba(111,183,227,.22);border-radius:3px;margin:28px 0 40px;overflow:hidden}
+  .cell{background:#152a46;padding:16px 14px;text-align:center}
+  .cell dt{font-family:"IBM Plex Mono",monospace;font-size:10px;letter-spacing:.11em;text-transform:uppercase;color:rgba(245,239,227,.5);margin:0 0 5px}
+  .cell dd{margin:0;font-family:"IBM Plex Mono",monospace;font-size:19px;font-weight:600;color:var(--sky);font-variant-numeric:tabular-nums}
+  .strip-note{font-family:"IBM Plex Mono",monospace;font-size:10.5px;color:rgba(245,239,227,.45);text-align:center;margin:-30px 0 40px}
+
+  /* tool cards */
+  .tool{background:var(--paper);color:var(--ink);border-radius:3px;margin-bottom:16px;
+    box-shadow:0 14px 30px rgba(0,0,0,.26);overflow:hidden;position:relative}
+  .tool::before{content:"";position:absolute;top:0;left:0;right:0;height:6px;
+    background:repeating-linear-gradient(90deg,var(--navy) 0 9px,transparent 9px 18px)}
+  .tool-body{padding:24px}
+  .tool-num{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:600;color:var(--rust);letter-spacing:.1em}
+  .tool h2{font-family:"Space Grotesk",sans-serif;font-size:21px;font-weight:700;margin:6px 0 4px;color:var(--navy)}
+  .tool .sub{font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:rgba(13,23,38,.5);margin:0 0 12px}
+  .tool p{margin:0 0 14px;font-size:15px;color:rgba(13,23,38,.8)}
+  .tool .live{font-family:"IBM Plex Mono",monospace;font-size:12px;background:rgba(111,183,227,.14);
+    border-radius:2px;padding:9px 11px;margin:0 0 14px;color:rgba(13,23,38,.75)}
+  .tool .live b{color:var(--navy)}
+  .go{display:inline-block;font-family:"IBM Plex Sans",sans-serif;font-weight:600;font-size:14.5px;
+    text-decoration:none;background:var(--navy);color:var(--cream);padding:11px 18px;border-radius:3px;transition:background .15s}
+  .go:hover{background:#1e3557}
+  .go:focus-visible{outline:3px solid var(--sky);outline-offset:2px}
+  .addr{font-family:"IBM Plex Mono",monospace;font-size:10.5px;color:rgba(13,23,38,.45);
+    border-top:1px dashed var(--rule);padding:11px 24px;margin:0;word-break:break-all}
+  .addr a{color:#1c5f88}
+
+  /* prose sections */
+  .sect{margin:44px 0 0}
+  .sect h3{font-family:"Space Grotesk",sans-serif;font-size:15px;font-weight:700;letter-spacing:.02em;
+    color:var(--sky);text-transform:uppercase;margin:0 0 14px}
+  .sect p{color:rgba(245,239,227,.74);margin:0 0 13px;max-width:62ch}
+  .sect b{color:var(--cream);font-weight:500}
+  .facts{list-style:none;padding:0;margin:0}
+  .facts li{border-top:1px solid rgba(111,183,227,.18);padding:12px 0;display:flex;gap:16px;
+    font-size:15px;color:rgba(245,239,227,.74);align-items:baseline}
+  .facts li:last-child{border-bottom:1px solid rgba(111,183,227,.18)}
+  .facts span{font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.08em;text-transform:uppercase;
+    color:var(--sky);flex:0 0 118px}
+  .caveat{border-left:2px solid var(--rust);padding:2px 0 2px 14px;margin:18px 0 0}
+  .caveat p{color:rgba(245,239,227,.66);font-size:14.5px}
+  footer{margin-top:48px;padding-top:20px;border-top:1px solid rgba(111,183,227,.18);
+    font-family:"IBM Plex Mono",monospace;font-size:11px;line-height:1.75;color:rgba(245,239,227,.45)}
+  footer a{color:var(--sky)}
+  @media (max-width:560px){
+    .strip{grid-template-columns:1fr}
+    .facts li{flex-direction:column;gap:3px}
+    .facts span{flex:none}
+  }
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <div class="masthead">
+    <div class="wordmark">Mechanical<span>Temp</span></div>
+    <div class="netbadge" id="netBadge">Arc Testnet · 5042002</div>
+  </div>
+
+  <header class="hero">
+    <p class="eyebrow">Southfield, Michigan · Licensed HVAC & mechanical · Lic. #7117025</p>
+    <h1>A contractor's money plumbing, <em>rebuilt onchain</em>.</h1>
+    <p class="lede">Three working systems on <b>Arc</b>, Circle's stablecoin chain: invoices that settle in under a second, escrow that releases draws on a clock instead of a phone call, and a vault backed by real HVAC revenue. Built and operated by the contractor, not bought from a vendor.</p>
+  </header>
+
+  <dl class="strip">
+    <div class="cell"><dt>Invoices issued</dt><dd id="invCount">—</dd></div>
+    <div class="cell"><dt>Escrow jobs</dt><dd id="jobCount">—</dd></div>
+    <div class="cell"><dt>MTYLD / share</dt><dd id="ppsOut">—</dd></div>
+  </dl>
+  <p class="strip-note" id="stripNote">Reading live from Arc…</p>
+
+  <!-- 01 -->
+  <article class="tool">
+    <div class="tool-body">
+      <div class="tool-num">01</div>
+      <h2>Invoice settlement</h2>
+      <p class="sub">MTInvoiceRegistry · arcpay.html</p>
+      <p>A service invoice becomes a link, the link becomes a QR code on the printed copy, and the customer pays it in one signature. USDC is Arc's native gas token, so there's no token approval and nothing to acquire first — they just pay. Settlement is final in under a second, and the contract never holds the money: every payment forwards to the treasury inside the same transaction.</p>
+      <p class="live" id="liveInv">Loading…</p>
+      <a class="go" href="./arcpay.html">Open the pay page →</a>
+    </div>
+    <p class="addr">0xd435e6D506424AdA0A3BBc06e6d3E3Bf5E2C157D · <a href="https://testnet.arcscan.app/address/0xd435e6D506424AdA0A3BBc06e6d3E3Bf5E2C157D" target="_blank" rel="noopener">verified source</a></p>
+  </article>
+
+  <!-- 02 -->
+  <article class="tool">
+    <div class="tool-body">
+      <div class="tool-num">02</div>
+      <h2>Progress-billing escrow</h2>
+      <p class="sub">MTProgressEscrow · arcdraw.html</p>
+      <p>The customer funds the whole job up front, so the money is provably there before equipment gets ordered. The contractor marks each draw complete, which starts an objection window; silence releases the draw automatically, an objection freezes it cold. There is no on-chain arbitrator, deliberately — a frozen draw stays frozen until a human relents, which makes stalemate visible instead of pretending code can settle a dispute.</p>
+      <p class="live" id="liveJob">Loading…</p>
+      <a class="go" href="./arcdraw.html">Open the draw schedule →</a>
+    </div>
+    <p class="addr">0xb1F6c301853806C82E77f2B1B73b23264097bB98 · <a href="https://testnet.arcscan.app/address/0xb1F6c301853806C82E77f2B1B73b23264097bB98" target="_blank" rel="noopener">verified source</a></p>
+  </article>
+
+  <!-- 03 -->
+  <article class="tool">
+    <div class="tool-body">
+      <div class="tool-num">03</div>
+      <h2>MTYLD revenue vault</h2>
+      <p class="sub">ERC-4626 · Mtyld.html</p>
+      <p>A USDC vault whose share price rises when Mechanical Temp reports revenue into it. Reporting mints no new shares, so nobody is diluted — the same claim is simply worth more. A permanently locked position was minted at launch and can never be redeemed by anyone, which keeps the share-price divisor from collapsing toward zero. That failure has bitten this builder before; the guard is the lesson.</p>
+      <p class="live" id="liveVault">Loading…</p>
+      <a class="go" href="./Mtyld.html">Open the vault →</a>
+    </div>
+    <p class="addr">0x5a89a64D7FCfE0128d068a372c04F8B8204bDb60 · <a href="https://testnet.arcscan.app/address/0x5a89a64D7FCfE0128d068a372c04F8B8204bDb60" target="_blank" rel="noopener">verified source</a></p>
+  </article>
+
+  <section class="sect">
+    <h3>Why Arc</h3>
+    <ul class="facts">
+      <li><span>USDC as gas</span>Fees are dollar-denominated. A customer paying an invoice needs no second token and no bridge — the thing they're paying with is the thing that pays the fee.</li>
+      <li><span>Sub-second</span>Malachite consensus gives deterministic finality, not probabilistic confirmation. When a draw releases, it has released.</li>
+      <li><span>Real cost</span>Every contract here was deployed, verified and exercised for roughly fifteen cents in total fees. A card processor would take about 75¢ on a single $25 invoice.</li>
+      <li><span>EVM</span>Standard Solidity and standard tooling. Nothing here is exotic; that's the point.</li>
+    </ul>
+  </section>
+
+  <section class="sect">
+    <h3>What this isn't</h3>
+    <p>Straight answers, because the alternative is embarrassing later.</p>
+    <div class="caveat">
+      <p><b>This is testnet.</b> Every dollar shown on these pages is play money from a faucet. Arc mainnet hasn't launched publicly, and none of this touches a real customer invoice yet.</p>
+      <p><b>The contracts are unaudited.</b> They compile clean, they've been exercised end to end, and the vault's NAV math is verified against a reproducible simulation. That is not the same as a professional review, and the escrow and vault both hold funds.</p>
+      <p><b>No promises are attached to MTYLD.</b> It is a claim on revenue that the operator chooses to report. It is not an offering, not a security pitch, and not a yield guarantee.</p>
+    </div>
+  </section>
+
+  <section class="sect">
+    <h3>Mechanical Temp LLC</h3>
+    <p>Licensed HVAC and mechanical contracting across Metro Detroit — RTUs, air handlers, commercial refrigeration, and building automation. Twenty-plus years in the field, and a habit of building the software instead of renting it.</p>
+    <p>23093 Telegraph Rd, Southfield MI · <a href="tel:3132824758" style="color:var(--sky)">313-282-4758</a> · <a href="https://mechanicaltemp.com" target="_blank" rel="noopener">mechanicaltemp.com</a></p>
+  </section>
+
+  <footer>
+    Chain 5042002 · explorer <a href="https://testnet.arcscan.app" target="_blank" rel="noopener">testnet.arcscan.app</a><br>
+    All three contracts verified onchain — read the source before you trust the page.
+  </footer>
+</div>
+
+<script>
+const RPCS=["https://rpc.blockdaemon.testnet.arc.network","https://arc-testnet.drpc.org","https://rpc.quicknode.testnet.arc.network","https://5042002.rpc.thirdweb.com","https://rpc.testnet.arc.network","https://rpc.testnet.arc.io"];
+const INV="0xd435e6D506424AdA0A3BBc06e6d3E3Bf5E2C157D";
+const ESC="0xb1F6c301853806C82E77f2B1B73b23264097bB98";
+const VAULT="0x5a89a64D7FCfE0128d068a372c04F8B8204bDb60";
+
+const pool=RPCS.map(u=>new ethers.JsonRpcProvider(u));
+async function call(addr,abi,fn){
+  let last;
+  for(const p of pool){ try{ return await fn(new ethers.Contract(addr,abi,p)); }catch(e){ last=e; } }
+  throw last;
+}
+const $=id=>document.getElementById(id);
+const usd=v=>Number(ethers.formatUnits(v,6)).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
+
+(async function(){
+  let ok=0;
+
+  try{
+    const n=await call(INV,["function invoiceCount() view returns (uint256)"],c=>c.invoiceCount());
+    $("invCount").textContent=n.toString();
+    $("liveInv").innerHTML="Live: <b>"+n.toString()+"</b> invoice"+(n===1n?"":"s")+
+      " issued on this contract. Each one is a number, an amount, and a settlement time — customer names and addresses stay off-chain in the back office.";
+    ok++;
+  }catch(e){ $("liveInv").textContent="Couldn't reach the invoice contract just now — the public RPCs rate-limit under load. The page below still works."; }
+
+  try{
+    const n=await call(ESC,["function jobCount() view returns (uint256)"],c=>c.jobCount());
+    $("jobCount").textContent=n.toString();
+    $("liveJob").innerHTML="Live: <b>"+n.toString()+"</b> job schedule"+(n===1n?"":"s")+
+      " created. Objection windows are set per job — a residential changeout and a commercial retrofit shouldn't run the same clock.";
+    ok++;
+  }catch(e){ $("liveJob").textContent="Couldn't reach the escrow contract just now — the public RPCs rate-limit under load. The page below still works."; }
+
+  try{
+    const n=await call(VAULT,["function navSnapshot() view returns (uint256,uint256,uint256,uint256,uint256,uint16,uint16,bool,bool)"],c=>c.navSnapshot());
+    const pps=Number(ethers.formatUnits(n[2],6));
+    const lockPct=n[1]>0n?Number(n[3]*10000n/n[1])/100:100;
+    $("ppsOut").textContent="$"+pps.toFixed(4);
+    $("liveVault").innerHTML="Live: <b>"+usd(n[0])+" USDC</b> in the vault at <b>$"+pps.toFixed(6)+
+      "</b> per share"+(pps>1.0000005?" — up "+((pps-1)*100).toFixed(2)+"% from the $1.00 launch price":" (launch price)")+
+      ". <b>"+lockPct.toFixed(1)+"%</b> of supply is locked forever and can never be redeemed.";
+    ok++;
+  }catch(e){ $("liveVault").textContent="Couldn't reach the vault just now — the public RPCs rate-limit under load. The page below still works."; }
+
+  $("stripNote").textContent = ok===3
+    ? "Read live from Arc just now — not cached, not typed in by hand."
+    : ok===0 ? "Chain reads are failing right now; the public RPCs throttle under load. Try a reload."
+    : "Partial read — some public RPCs are throttling. Reload for the rest.";
+})();
+</script>
+</body>
+</html>
