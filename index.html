@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pay Invoice · Mechanical Temp</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/ethers@6.13.4/dist/ethers.umd.min.js"></script>
+<style>
+  :root{
+    --navy:#16263f;
+    --sky:#6fb7e3;
+    --cream:#f5efe3;
+    --rust:#b5512f;
+    --ink:#0d1726;
+    --rule:rgba(22,38,63,.16);
+    --rule-hard:rgba(22,38,63,.34);
+    --ok:#2f7d4f;
+    --paper:#fbf8f2;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    background:var(--navy);
+    background-image:
+      radial-gradient(1200px 600px at 50% -10%, rgba(111,183,227,.18), transparent 60%);
+    color:var(--ink);
+    font-family:"IBM Plex Sans",system-ui,sans-serif;
+    font-size:16px;
+    line-height:1.5;
+    padding:28px 16px 64px;
+    display:flex;
+    justify-content:center;
+  }
+  .shell{width:100%;max-width:660px}
+
+  /* ---------- masthead ---------- */
+  .masthead{
+    display:flex;align-items:baseline;justify-content:space-between;
+    gap:16px;margin-bottom:14px;flex-wrap:wrap;
+  }
+  .wordmark{
+    font-family:"Space Grotesk",sans-serif;font-weight:700;
+    font-size:20px;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--cream);
+  }
+  .wordmark span{color:var(--sky)}
+  .netbadge{
+    font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.08em;
+    text-transform:uppercase;color:var(--sky);
+    border:1px solid rgba(111,183,227,.42);border-radius:2px;
+    padding:4px 9px;white-space:nowrap;
+  }
+
+  /* ---------- the ticket ---------- */
+  .ticket{
+    position:relative;background:var(--paper);
+    border-radius:3px;overflow:hidden;
+    box-shadow:0 22px 44px rgba(0,0,0,.34);
+  }
+  .ticket::before{
+    content:"";position:absolute;top:0;left:0;right:0;height:7px;
+    background:
+      repeating-linear-gradient(90deg,var(--navy) 0 9px,transparent 9px 18px);
+  }
+  .ticket-head{
+    padding:26px 24px 16px;border-bottom:2px solid var(--navy);
+    display:flex;justify-content:space-between;align-items:flex-start;gap:18px;
+    flex-wrap:wrap;
+  }
+  .doctype{
+    font-family:"Space Grotesk",sans-serif;font-weight:700;
+    font-size:clamp(22px,6vw,30px);line-height:1.05;
+    letter-spacing:-.01em;color:var(--navy);margin:0;
+  }
+  .doctype small{
+    display:block;font-family:"IBM Plex Mono",monospace;font-weight:400;
+    font-size:11px;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--rust);margin-bottom:7px;
+  }
+  .issuer{
+    font-family:"IBM Plex Mono",monospace;font-size:11px;line-height:1.65;
+    color:rgba(13,23,38,.62);text-align:right;
+  }
+
+  /* ---------- ruled rows ---------- */
+  .rows{padding:4px 24px 8px}
+  .row{
+    display:flex;justify-content:space-between;align-items:baseline;gap:14px;
+    padding:11px 0;border-bottom:1px solid var(--rule);
+  }
+  .row:last-child{border-bottom:0}
+  .row dt{
+    font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.1em;
+    text-transform:uppercase;color:rgba(13,23,38,.55);margin:0;flex:none;
+  }
+  .row dd{
+    margin:0;font-family:"IBM Plex Mono",monospace;font-size:14px;
+    font-weight:500;text-align:right;word-break:break-all;color:var(--ink);
+  }
+  .row.total{border-top:2px solid var(--navy);border-bottom:0;margin-top:6px;padding-top:14px}
+  .row.total dt{color:var(--navy);font-weight:600}
+  .row.total dd{font-size:26px;font-weight:600;color:var(--navy)}
+  .row.total dd em{font-style:normal;font-size:13px;color:rgba(13,23,38,.5);margin-left:6px}
+
+  .chip{
+    display:inline-block;font-family:"IBM Plex Mono",monospace;font-size:11px;
+    letter-spacing:.08em;text-transform:uppercase;padding:3px 8px;border-radius:2px;
+  }
+  .chip.open{background:rgba(181,81,47,.12);color:var(--rust)}
+  .chip.part{background:rgba(111,183,227,.2);color:#1c5f88}
+  .chip.paid{background:rgba(47,125,79,.13);color:var(--ok)}
+  .chip.void{background:rgba(13,23,38,.09);color:rgba(13,23,38,.55)}
+
+  /* ---------- signature: the stamp ---------- */
+  .stamp{
+    position:absolute;right:20px;top:96px;
+    font-family:"Space Grotesk",sans-serif;font-weight:700;font-size:44px;
+    letter-spacing:.1em;color:var(--ok);border:5px solid var(--ok);
+    border-radius:5px;padding:6px 16px;opacity:0;pointer-events:none;
+    transform:rotate(-13deg) scale(2.1);
+    mix-blend-mode:multiply;
+  }
+  .stamp.on{animation:slam .42s cubic-bezier(.2,1.5,.4,1) forwards}
+  @keyframes slam{
+    0%{opacity:0;transform:rotate(-13deg) scale(2.1)}
+    70%{opacity:.95;transform:rotate(-13deg) scale(.94)}
+    100%{opacity:.9;transform:rotate(-13deg) scale(1)}
+  }
+
+  /* ---------- panels ---------- */
+  .panel{
+    background:var(--paper);border-radius:3px;margin-top:14px;padding:20px 24px;
+    box-shadow:0 12px 26px rgba(0,0,0,.22);
+  }
+  .panel h2{
+    font-family:"Space Grotesk",sans-serif;font-size:15px;font-weight:700;
+    letter-spacing:.02em;margin:0 0 3px;color:var(--navy);
+  }
+  .how{
+    font-size:13px;color:rgba(13,23,38,.62);margin:0 0 15px;
+    border-left:2px solid var(--sky);padding-left:10px;
+  }
+  button{
+    font-family:"IBM Plex Sans",sans-serif;font-size:15px;font-weight:600;
+    border:0;border-radius:3px;padding:14px 20px;cursor:pointer;width:100%;
+    background:var(--navy);color:var(--cream);transition:background .15s;
+  }
+  button:hover:not(:disabled){background:#1e3557}
+  button:focus-visible{outline:3px solid var(--sky);outline-offset:2px}
+  button:disabled{background:rgba(13,23,38,.14);color:rgba(13,23,38,.45);cursor:not-allowed}
+  button.ghost{background:transparent;color:var(--navy);box-shadow:inset 0 0 0 1.5px var(--rule-hard)}
+  button.ghost:hover:not(:disabled){background:rgba(22,38,63,.06)}
+  .why{
+    font-family:"IBM Plex Mono",monospace;font-size:11.5px;line-height:1.6;
+    color:rgba(13,23,38,.6);margin:9px 0 0;
+  }
+  .why.warn{color:var(--rust)}
+  input{
+    width:100%;font-family:"IBM Plex Mono",monospace;font-size:14px;
+    padding:11px 12px;border:1.5px solid var(--rule-hard);border-radius:3px;
+    background:#fff;color:var(--ink);margin-bottom:9px;
+  }
+  input:focus-visible{outline:3px solid var(--sky);outline-offset:1px;border-color:var(--sky)}
+  .field-label{
+    font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.1em;
+    text-transform:uppercase;color:rgba(13,23,38,.55);display:block;margin-bottom:5px;
+  }
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  a{color:#1c5f88}
+  .hidden{display:none !important}
+  .note{
+    font-family:"IBM Plex Mono",monospace;font-size:11px;line-height:1.65;
+    color:rgba(245,239,227,.62);margin-top:18px;text-align:center;
+  }
+  .note code{color:var(--sky)}
+  @media (prefers-reduced-motion:reduce){
+    .stamp.on{animation:none;opacity:.9;transform:rotate(-13deg) scale(1)}
+    *{transition:none !important}
+  }
+  @media (max-width:520px){
+    .issuer{text-align:left}
+    .stamp{font-size:32px;top:auto;bottom:14px;right:14px}
+    .two{grid-template-columns:1fr}
+  }
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <div class="masthead">
+    <div class="wordmark">Mechanical<span>Temp</span></div>
+    <div class="netbadge" id="netBadge">Arc Testnet · 5042002</div>
+  </div>
+
+  <!-- ================= TICKET ================= -->
+  <section class="ticket">
+    <div class="stamp" id="stamp">PAID</div>
+
+    <div class="ticket-head">
+      <h1 class="doctype"><small>Service Invoice</small><span id="invNumOut">—</span></h1>
+      <div class="issuer">
+        Mechanical Temp LLC<br>
+        23093 Telegraph Rd<br>
+        Southfield, MI<br>
+        Lic. #7117025
+      </div>
+    </div>
+
+    <dl class="rows" id="rows">
+      <div class="row"><dt>Status</dt><dd id="statusOut"><span class="chip void">Not loaded</span></dd></div>
+      <div class="row"><dt>Issued</dt><dd id="issuedOut">—</dd></div>
+      <div class="row"><dt>Paid to date</dt><dd id="paidOut">—</dd></div>
+      <div class="row total"><dt>Balance due</dt><dd id="dueOut">—<em id="dueUnit"></em></dd></div>
+    </dl>
+  </section>
+
+  <!-- ================= PAY ================= -->
+  <section class="panel">
+    <h2>Pay this invoice</h2>
+    <p class="how">USDC is Arc's native gas token, so payment is a plain transfer — no token approval, no second signature. One transaction settles in under a second.</p>
+
+    <div id="payArea">
+      <button id="connectBtn">Connect wallet</button>
+      <p class="why" id="payWhy">Nothing is charged yet. The amount comes from the contract, not from this page — connecting only lets you sign.</p>
+    </div>
+
+    <div id="receipt" class="hidden">
+      <p class="why" id="receiptTxt"></p>
+    </div>
+  </section>
+
+  <!-- ================= ISSUER (owner only) ================= -->
+  <section class="panel hidden" id="ownerPanel">
+    <h2>Issue an invoice</h2>
+    <p class="how">Visible because the connected wallet is the contract owner. Creating an invoice costs a few cents of USDC in gas and cannot be edited afterward — void and reissue instead.</p>
+    <label class="field-label" for="newNum">Invoice number</label>
+    <input id="newNum" placeholder="INV-1042" autocomplete="off">
+    <label class="field-label" for="newAmt">Amount due (USDC)</label>
+    <input id="newAmt" placeholder="1250.00" inputmode="decimal" autocomplete="off">
+    <div class="two">
+      <button id="createBtn">Create invoice</button>
+      <button id="linkBtn" class="ghost">Copy pay link</button>
+    </div>
+    <p class="why" id="ownerWhy">The pay link is this page with <code>?inv=</code> appended — that string is what goes in the QR code on the printed invoice.</p>
+  </section>
+
+  <!-- ================= LOOKUP ================= -->
+  <section class="panel" id="lookupPanel">
+    <h2>Look up a different invoice</h2>
+    <p class="how">Reads directly from the chain. Anyone can check an invoice's balance; only the payer's wallet can pay it.</p>
+    <input id="lookupNum" placeholder="INV-1042" autocomplete="off">
+    <button id="lookupBtn" class="ghost">Load invoice</button>
+  </section>
+
+  <p class="note">
+    Contract <code id="addrOut">not set</code><br>
+    Verify on <a href="https://testnet.arcscan.app" target="_blank" rel="noopener">testnet.arcscan.app</a> · testnet funds only
+  </p>
+</div>
+
+<script>
+/* ============================================================
+   CONFIG — set these two before use
+   ============================================================ */
+const CONTRACT = "0x0000000000000000000000000000000000000000"; // MTInvoiceRegistry
+const RPC      = "https://rpc.testnet.arc.io";
+const CHAIN_ID = 5042002;
+const EXPLORER = "https://testnet.arcscan.app";
+
+/* Arc's docs list native USDC as 18 decimals; at least one node provider's
+   docs claim 6. Verify empirically before issuing a real invoice: load a
+   wallet with faucet USDC and check that the balance printed by verifyUnits()
+   in the console matches what the faucet gave you. Flip this if it doesn't. */
+const NATIVE_DECIMALS = 18;
+
+const ABI = [
+  "function getInvoice(string) view returns (bool exists,bool voided,uint256 amountDue,uint256 amountPaid,uint256 remaining,uint64 createdAt,uint64 settledAt,address lastPayer)",
+  "function pay(string) payable",
+  "function createInvoice(string,uint256)",
+  "function owner() view returns (address)",
+  "function paused() view returns (bool)",
+  "event InvoicePaid(bytes32 indexed id,string invNum,address indexed payer,uint256 amount,uint256 amountPaid,uint256 amountDue,bool settled)"
+];
+
+const ARC_PARAMS = {
+  chainId: "0x" + CHAIN_ID.toString(16),
+  chainName: "Arc Testnet",
+  nativeCurrency: { name: "USDC", symbol: "USDC", decimals: NATIVE_DECIMALS },
+  rpcUrls: [RPC],
+  blockExplorerUrls: [EXPLORER]
+};
+
+/* ============================================================ */
+const $ = id => document.getElementById(id);
+const fmt = v => Number(ethers.formatUnits(v, NATIVE_DECIMALS))
+  .toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+let readProvider = new ethers.JsonRpcProvider(RPC);
+let signer = null, current = null, invNum = "";
+
+$("addrOut").textContent = CONTRACT;
+
+/* --- which invoice? --- */
+invNum = new URLSearchParams(location.search).get("inv") || "";
+if (invNum) { $("lookupNum").value = invNum; load(); }
+else {
+  $("payWhy").textContent = "No invoice number in the link. Enter one below, or scan the QR code on your invoice.";
+  $("connectBtn").disabled = true;
+}
+
+/* --- read state from chain --- */
+async function load() {
+  if (!invNum) return;
+  $("invNumOut").textContent = invNum;
+  try {
+    const c = new ethers.Contract(CONTRACT, ABI, readProvider);
+    const r = await c.getInvoice(invNum);
+    current = {
+      exists: r[0], voided: r[1], due: r[2], paid: r[3],
+      remaining: r[4], createdAt: Number(r[5]), settledAt: Number(r[6])
+    };
+    render();
+  } catch (e) {
+    $("statusOut").innerHTML = '<span class="chip void">Unreachable</span>';
+    $("payWhy").textContent = "Couldn't reach the contract. Check that the address and RPC in this page are set, then reload.";
+    $("payWhy").className = "why warn";
+    console.error(e);
+  }
+}
+
+function render() {
+  const c = current;
+  if (!c.exists) {
+    $("statusOut").innerHTML = '<span class="chip void">No such invoice</span>';
+    $("dueOut").textContent = "—";
+    $("payWhy").textContent = 'Invoice "' + invNum + '" has not been issued on this contract. Check the number against your paper copy.';
+    $("connectBtn").disabled = true;
+    return;
+  }
+  $("issuedOut").textContent = new Date(c.createdAt * 1000).toLocaleDateString();
+  $("paidOut").textContent = fmt(c.paid) + " USDC";
+  $("dueOut").firstChild.nodeValue = fmt(c.remaining);
+  $("dueUnit").textContent = " USDC";
+
+  const settled = c.settledAt > 0;
+  if (c.voided) {
+    $("statusOut").innerHTML = '<span class="chip void">Voided</span>';
+    $("payWhy").textContent = "This invoice was voided by Mechanical Temp and can't take payment. Call 313-282-4758 if you were expecting a balance.";
+    $("connectBtn").disabled = true;
+  } else if (settled) {
+    $("statusOut").innerHTML = '<span class="chip paid">Paid in full</span>';
+    $("stamp").classList.add("on");
+    $("payWhy").textContent = "Settled " + new Date(c.settledAt * 1000).toLocaleString() + ". Nothing further is owed.";
+    $("connectBtn").disabled = true;
+  } else if (c.paid > 0n) {
+    $("statusOut").innerHTML = '<span class="chip part">Partially paid</span>';
+  } else {
+    $("statusOut").innerHTML = '<span class="chip open">Open</span>';
+  }
+}
+
+/* --- connect --- */
+$("connectBtn").onclick = async () => {
+  if (!window.ethereum) {
+    $("payWhy").textContent = "No wallet found in this browser. Open this link in MetaMask's browser, or install a wallet extension.";
+    $("payWhy").className = "why warn";
+    return;
+  }
+  try {
+    await window.ethereum.request({ method: "eth_requestAccounts" });
+    const net = await window.ethereum.request({ method: "eth_chainId" });
+    if (parseInt(net, 16) !== CHAIN_ID) {
+      try {
+        await window.ethereum.request({
+          method: "wallet_switchEthereumChain",
+          params: [{ chainId: ARC_PARAMS.chainId }]
+        });
+      } catch (err) {
+        if (err.code === 4902) {
+          await window.ethereum.request({ method: "wallet_addEthereumChain", params: [ARC_PARAMS] });
+        } else throw err;
+      }
+    }
+    const bp = new ethers.BrowserProvider(window.ethereum);
+    signer = await bp.getSigner();
+    await afterConnect();
+  } catch (e) {
+    $("payWhy").textContent = "Wallet didn't connect: " + (e.shortMessage || e.message);
+    $("payWhy").className = "why warn";
+  }
+};
+
+async function afterConnect() {
+  const me = await signer.getAddress();
+  const bal = await signer.provider.getBalance(me);
+  const short = me.slice(0, 6) + "…" + me.slice(-4);
+
+  $("connectBtn").textContent = "Pay " + fmt(current.remaining) + " USDC";
+  $("connectBtn").onclick = doPay;
+
+  if (bal < current.remaining) {
+    $("connectBtn").disabled = true;
+    $("payWhy").textContent = short + " holds " + fmt(bal) + " USDC — not enough to cover the balance, and gas comes out of the same token. Top up at faucet.circle.com.";
+    $("payWhy").className = "why warn";
+  } else {
+    $("payWhy").textContent = short + " · balance " + fmt(bal) + " USDC. Gas is paid in USDC too, so a few cents extra leaves the wallet.";
+    $("payWhy").className = "why";
+  }
+
+  // owner tools
+  try {
+    const c = new ethers.Contract(CONTRACT, ABI, readProvider);
+    const own = await c.owner();
+    if (own.toLowerCase() === me.toLowerCase()) $("ownerPanel").classList.remove("hidden");
+  } catch (_) {}
+}
+
+/* --- pay --- */
+async function doPay() {
+  const btn = $("connectBtn");
+  btn.disabled = true; btn.textContent = "Confirm in wallet…";
+  try {
+    const c = new ethers.Contract(CONTRACT, ABI, signer);
+    const tx = await c.pay(invNum, { value: current.remaining });
+    btn.textContent = "Settling…";
+    $("payWhy").textContent = "Sent. Arc finalizes in under a second — waiting on the receipt.";
+    const rc = await tx.wait();
+    $("stamp").classList.add("on");
+    $("receipt").classList.remove("hidden");
+    $("receiptTxt").innerHTML =
+      'Paid in block ' + rc.blockNumber + '. <a href="' + EXPLORER + '/tx/' + tx.hash +
+      '" target="_blank" rel="noopener">View receipt</a> — keep this hash for your records.';
+    btn.textContent = "Paid in full";
+    $("payWhy").textContent = "Funds went straight to the Mechanical Temp treasury; this contract never held them.";
+    await load();
+  } catch (e) {
+    btn.disabled = false;
+    btn.textContent = "Pay " + fmt(current.remaining) + " USDC";
+    const m = e.shortMessage || e.message || "";
+    $("payWhy").textContent = m.includes("rejected")
+      ? "You rejected the signature. Nothing was charged — press Pay again when ready."
+      : "Payment didn't go through: " + m;
+    $("payWhy").className = "why warn";
+  }
+}
+
+/* --- owner: create --- */
+$("createBtn").onclick = async () => {
+  const n = $("newNum").value.trim(), a = $("newAmt").value.trim();
+  if (!n || !a) { $("ownerWhy").textContent = "Both fields are required — the number is the on-chain key and can't be changed later."; return; }
+  try {
+    $("createBtn").disabled = true; $("createBtn").textContent = "Confirm in wallet…";
+    const c = new ethers.Contract(CONTRACT, ABI, signer);
+    const tx = await c.createInvoice(n, ethers.parseUnits(a, NATIVE_DECIMALS));
+    await tx.wait();
+    $("ownerWhy").innerHTML = "Issued " + n + ". Pay link: <code>" + location.origin + location.pathname + "?inv=" + encodeURIComponent(n) + "</code>";
+  } catch (e) {
+    $("ownerWhy").textContent = "Not created: " + (e.shortMessage || e.message);
+  } finally {
+    $("createBtn").disabled = false; $("createBtn").textContent = "Create invoice";
+  }
+};
+
+$("linkBtn").onclick = () => {
+  const n = $("newNum").value.trim() || invNum;
+  if (!n) { $("ownerWhy").textContent = "Enter an invoice number first — the link needs one to point at."; return; }
+  const url = location.origin + location.pathname + "?inv=" + encodeURIComponent(n);
+  navigator.clipboard.writeText(url);
+  $("ownerWhy").textContent = "Copied: " + url;
+};
+
+$("lookupBtn").onclick = () => {
+  const n = $("lookupNum").value.trim();
+  if (!n) return;
+  location.search = "?inv=" + encodeURIComponent(n);
+};
+
+/* --- decimals sanity check, run from the console --- */
+window.verifyUnits = async (addr) => {
+  const bal = await readProvider.getBalance(addr);
+  console.log("raw wei:", bal.toString());
+  console.log("as 18dec:", ethers.formatUnits(bal, 18));
+  console.log("as  6dec:", ethers.formatUnits(bal, 6));
+  console.log("→ whichever matches your faucet balance is the right NATIVE_DECIMALS");
+};
+</script>
+</body>
+</html>
