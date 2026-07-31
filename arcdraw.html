@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Draw Schedule · Mechanical Temp</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/ethers@6.13.4/dist/ethers.umd.min.js"></script>
+<style>
+  :root{
+    --navy:#16263f; --sky:#6fb7e3; --cream:#f5efe3; --rust:#b5512f;
+    --ink:#0d1726; --rule:rgba(22,38,63,.16); --rule-hard:rgba(22,38,63,.34);
+    --ok:#2f7d4f; --paper:#fbf8f2; --amber:#a8761f;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    background:var(--navy);
+    background-image:radial-gradient(1200px 600px at 50% -10%,rgba(111,183,227,.18),transparent 60%);
+    color:var(--ink);font-family:"IBM Plex Sans",system-ui,sans-serif;
+    font-size:16px;line-height:1.5;padding:28px 16px 64px;
+    display:flex;justify-content:center;
+  }
+  .shell{width:100%;max-width:720px}
+  .masthead{display:flex;align-items:baseline;justify-content:space-between;gap:16px;margin-bottom:14px;flex-wrap:wrap}
+  .wordmark{font-family:"Space Grotesk",sans-serif;font-weight:700;font-size:20px;letter-spacing:.14em;text-transform:uppercase;color:var(--cream)}
+  .wordmark span{color:var(--sky)}
+  .netbadge{font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--sky);border:1px solid rgba(111,183,227,.42);border-radius:2px;padding:4px 9px;white-space:nowrap}
+  .netbadge.live{color:var(--cream);border-color:rgba(181,81,47,.75);background:rgba(181,81,47,.28)}
+
+  .sheet{position:relative;background:var(--paper);border-radius:3px;overflow:hidden;box-shadow:0 22px 44px rgba(0,0,0,.34)}
+  .sheet::before{content:"";position:absolute;top:0;left:0;right:0;height:7px;background:repeating-linear-gradient(90deg,var(--navy) 0 9px,transparent 9px 18px)}
+  .sheet-head{padding:26px 24px 16px;border-bottom:2px solid var(--navy);display:flex;justify-content:space-between;align-items:flex-start;gap:18px;flex-wrap:wrap}
+  .doctype{font-family:"Space Grotesk",sans-serif;font-weight:700;font-size:clamp(22px,6vw,30px);line-height:1.05;letter-spacing:-.01em;color:var(--navy);margin:0}
+  .doctype small{display:block;font-family:"IBM Plex Mono",monospace;font-weight:400;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--rust);margin-bottom:7px}
+  .issuer{font-family:"IBM Plex Mono",monospace;font-size:11px;line-height:1.65;color:rgba(13,23,38,.62);text-align:right}
+
+  .totals{display:grid;grid-template-columns:repeat(4,1fr);border-bottom:1px solid var(--rule)}
+  .tot{padding:14px 12px;border-right:1px solid var(--rule);text-align:center}
+  .tot:last-child{border-right:0}
+  .tot dt{font-family:"IBM Plex Mono",monospace;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:rgba(13,23,38,.5);margin:0 0 4px}
+  .tot dd{margin:0;font-family:"IBM Plex Mono",monospace;font-size:16px;font-weight:600}
+  .tot.held dd{color:var(--navy)}
+  .tot.rel dd{color:var(--ok)}
+  .tot.ref dd{color:var(--rust)}
+
+  /* draws — numbering is meaningful here, draws are sequential */
+  .draws{padding:0}
+  .draw{display:grid;grid-template-columns:auto 1fr auto;gap:14px;align-items:center;padding:15px 24px;border-bottom:1px solid var(--rule)}
+  .draw:last-child{border-bottom:0}
+  .dnum{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:600;color:rgba(13,23,38,.35);letter-spacing:.06em}
+  .dbody{min-width:0}
+  .damt{font-family:"IBM Plex Mono",monospace;font-size:17px;font-weight:600;color:var(--ink)}
+  .dstate{font-family:"IBM Plex Mono",monospace;font-size:11px;line-height:1.55;color:rgba(13,23,38,.6);margin-top:3px}
+  .dstate.warn{color:var(--rust)}
+  .dstate.ok{color:var(--ok)}
+  .dstate.wait{color:var(--amber)}
+  .clock{font-variant-numeric:tabular-nums;font-weight:600}
+  .dact{display:flex;flex-direction:column;gap:6px;align-items:stretch}
+  .draw.done{opacity:.55}
+
+  .panel{background:var(--paper);border-radius:3px;margin-top:14px;padding:20px 24px;box-shadow:0 12px 26px rgba(0,0,0,.22)}
+  .panel h2{font-family:"Space Grotesk",sans-serif;font-size:15px;font-weight:700;margin:0 0 3px;color:var(--navy)}
+  .how{font-size:13px;color:rgba(13,23,38,.62);margin:0 0 15px;border-left:2px solid var(--sky);padding-left:10px}
+  button{font-family:"IBM Plex Sans",sans-serif;font-size:15px;font-weight:600;border:0;border-radius:3px;padding:13px 18px;cursor:pointer;width:100%;background:var(--navy);color:var(--cream);transition:background .15s}
+  button:hover:not(:disabled){background:#1e3557}
+  button:focus-visible{outline:3px solid var(--sky);outline-offset:2px}
+  button:disabled{background:rgba(13,23,38,.14);color:rgba(13,23,38,.45);cursor:not-allowed}
+  button.ghost{background:transparent;color:var(--navy);box-shadow:inset 0 0 0 1.5px var(--rule-hard)}
+  button.ghost:hover:not(:disabled){background:rgba(22,38,63,.06)}
+  button.danger{background:transparent;color:var(--rust);box-shadow:inset 0 0 0 1.5px rgba(181,81,47,.5)}
+  button.danger:hover:not(:disabled){background:rgba(181,81,47,.08)}
+  button.sm{font-size:12.5px;padding:8px 12px;width:auto;white-space:nowrap}
+  .why{font-family:"IBM Plex Mono",monospace;font-size:11.5px;line-height:1.6;color:rgba(13,23,38,.6);margin:9px 0 0}
+  .why.warn{color:var(--rust)}
+  input{width:100%;font-family:"IBM Plex Mono",monospace;font-size:14px;padding:11px 12px;border:1.5px solid var(--rule-hard);border-radius:3px;background:#fff;color:var(--ink);margin-bottom:9px}
+  input:focus-visible{outline:3px solid var(--sky);outline-offset:1px;border-color:var(--sky)}
+  .field-label{font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:rgba(13,23,38,.55);display:block;margin-bottom:5px}
+  .role{font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.06em;text-transform:uppercase;padding:3px 8px;border-radius:2px;background:rgba(111,183,227,.2);color:#1c5f88;display:inline-block}
+  .role.owner{background:rgba(22,38,63,.12);color:var(--navy)}
+  .role.cust{background:rgba(47,125,79,.13);color:var(--ok)}
+  .chip{display:inline-block;font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.08em;text-transform:uppercase;padding:3px 8px;border-radius:2px}
+  .chip.draft{background:rgba(181,81,47,.12);color:var(--rust)}
+  .chip.funded{background:rgba(111,183,227,.2);color:#1c5f88}
+  .chip.closed{background:rgba(13,23,38,.09);color:rgba(13,23,38,.55)}
+  .offchain{margin:0;padding:12px 24px 18px;border-top:1px dashed var(--rule);font-family:"IBM Plex Mono",monospace;font-size:10.5px;line-height:1.6;color:rgba(13,23,38,.5)}
+  .note{font-family:"IBM Plex Mono",monospace;font-size:11px;line-height:1.65;color:rgba(245,239,227,.62);margin-top:18px;text-align:center}
+  .note code{color:var(--sky)}
+  a{color:#1c5f88}
+  .hidden{display:none !important}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  @media (prefers-reduced-motion:reduce){*{transition:none !important}}
+  @media (max-width:560px){
+    .issuer{text-align:left}
+    .totals{grid-template-columns:1fr 1fr}
+    .tot{border-bottom:1px solid var(--rule)}
+    .draw{grid-template-columns:auto 1fr;gap:10px}
+    .dact{grid-column:1/-1;flex-direction:row;flex-wrap:wrap}
+    .two{grid-template-columns:1fr}
+  }
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <div class="masthead">
+    <div class="wordmark">Mechanical<span>Temp</span></div>
+    <div class="netbadge" id="netBadge">Arc Testnet</div>
+  </div>
+
+  <section class="sheet">
+    <div class="sheet-head">
+      <h1 class="doctype"><small>Draw Schedule</small><span id="jobRefOut">—</span></h1>
+      <div class="issuer">
+        Mechanical Temp LLC<br>
+        23093 Telegraph Rd<br>
+        Southfield, MI<br>
+        Lic. #7117025
+      </div>
+    </div>
+
+    <dl class="totals">
+      <div class="tot"><dt>Contract</dt><dd id="totOut">—</dd></div>
+      <div class="tot held"><dt>In Escrow</dt><dd id="heldOut">—</dd></div>
+      <div class="tot rel"><dt>Released</dt><dd id="relOut">—</dd></div>
+      <div class="tot ref"><dt>Returned</dt><dd id="refOut">—</dd></div>
+    </dl>
+
+    <div class="draws" id="draws">
+      <div class="draw"><span class="dnum">—</span><div class="dbody"><div class="dstate">No job loaded. Enter a job reference below.</div></div></div>
+    </div>
+
+    <p class="offchain">Scope, site address and customer name stay in DSM. Only the draw amounts and their status move on-chain — anything written here is public permanently.</p>
+  </section>
+
+  <section class="panel">
+    <h2>Your position on this job <span id="roleChip"></span></h2>
+    <p class="how" id="roleHow">Connect a wallet to see which actions are yours. The contract decides this from your address — contractor, customer, or neither.</p>
+    <button id="connectBtn">Connect wallet</button>
+    <p class="why" id="mainWhy"></p>
+    <button id="fundBtn" class="hidden" style="margin-top:10px">Fund escrow</button>
+    <button id="reclaimBtn" class="ghost hidden" style="margin-top:10px">Reclaim unreleased funds</button>
+  </section>
+
+  <section class="panel hidden" id="ownerPanel">
+    <h2>Create a job</h2>
+    <p class="how">Visible because you're the contract owner. Nothing is owed until the customer funds it, so creating a schedule is safe — but amounts can't be edited afterward.</p>
+    <label class="field-label" for="njRef">Job reference</label>
+    <input id="njRef" placeholder="DSM-JOB-2" autocomplete="off">
+    <label class="field-label" for="njCust">Customer wallet</label>
+    <input id="njCust" placeholder="0x…" autocomplete="off">
+    <label class="field-label" for="njAmts">Draw amounts in USDC, comma separated</label>
+    <input id="njAmts" placeholder="2500, 4000, 4000, 1500" autocomplete="off">
+    <label class="field-label" for="njWin">Objection window (seconds)</label>
+    <input id="njWin" placeholder="60" inputmode="numeric" autocomplete="off">
+    <div class="two">
+      <button id="createBtn">Create job</button>
+      <button id="njLink" class="ghost">Copy job link</button>
+    </div>
+    <p class="why" id="ownerWhy">The window is how long the customer has to object after you mark a draw complete. Silence past it releases the money.</p>
+  </section>
+
+  <section class="panel">
+    <h2>Open a different job</h2>
+    <p class="how">Reads straight from the chain. Anyone can look at a schedule; only the parties to it can act on it.</p>
+    <input id="lookupRef" placeholder="DSM-JOB-1" autocomplete="off">
+    <button id="lookupBtn" class="ghost">Load job</button>
+  </section>
+
+  <p class="note">
+    Escrow <code id="addrOut">—</code><br>
+    Verify on <a href="https://testnet.arcscan.app" target="_blank" rel="noopener">testnet.arcscan.app</a> · testnet funds only
+  </p>
+</div>
+
+<script>
+/* ============================================================
+   NETWORKS — flip ACTIVE to go live; ?net=testnet forces testnet
+   ============================================================ */
+const NETWORKS = {
+  testnet: {
+    label:"Arc Testnet", chainId:5042002,
+    rpc:"https://rpc.testnet.arc.io",
+    explorer:"https://testnet.arcscan.app",
+    contract:"0xb1F6c301853806C82E77f2B1B73b23264097bB98",
+    decimals:18, live:false
+  },
+  mainnet: {
+    label:"Arc", chainId:0, rpc:"", explorer:"", contract:"",
+    decimals:18, live:true
+  }
+};
+const ACTIVE = "testnet";
+const NET = NETWORKS[new URLSearchParams(location.search).get("net")] || NETWORKS[ACTIVE];
+const CONTRACT=NET.contract, RPC=NET.rpc, CHAIN_ID=NET.chainId, EXPLORER=NET.explorer, DEC=NET.decimals;
+
+const ABI = [
+  "function getJob(string) view returns (bool exists,address customer,uint8 status,uint256 total,uint256 released,uint256 refunded,uint256 held,uint64 createdAt,uint64 lastActivity,uint32 objectionWindow,uint256 milestoneCount)",
+  "function getMilestone(string,uint256) view returns (uint256 amount,uint8 state,uint64 claimedAt,uint64 releasableAt)",
+  "function reclaimableAt(string) view returns (uint64)",
+  "function owner() view returns (address)",
+  "function minWindow() view returns (uint32)",
+  "function createJob(string,address,uint256[],uint32)",
+  "function fund(string) payable",
+  "function claim(string,uint256)",
+  "function object(string,uint256)",
+  "function release(string,uint256)",
+  "function approve(string,uint256)",
+  "function refundMilestone(string,uint256)",
+  "function reclaim(string)"
+];
+
+const ARC_PARAMS = {
+  chainId:"0x"+CHAIN_ID.toString(16), chainName:NET.label,
+  nativeCurrency:{name:"USDC",symbol:"USDC",decimals:DEC},
+  rpcUrls:[RPC], blockExplorerUrls:[EXPLORER]
+};
+
+const M_PENDING=0, M_CLAIMED=1, M_RELEASED=2, M_DISPUTED=3, M_REFUNDED=4;
+const J_DRAFT=0, J_FUNDED=1, J_CLOSED=2;
+
+const $ = id => document.getElementById(id);
+const fmt = v => Number(ethers.formatUnits(v,DEC)).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
+const now = () => Math.floor(Date.now()/1000);
+
+function countdown(secs){
+  if (secs <= 0) return "0:00";
+  const d=Math.floor(secs/86400), h=Math.floor(secs%86400/3600), m=Math.floor(secs%3600/60), s=secs%60;
+  if (d) return d+"d "+h+"h";
+  if (h) return h+"h "+String(m).padStart(2,"0")+"m";
+  return m+":"+String(s).padStart(2,"0");
+}
+
+let readProvider = new ethers.JsonRpcProvider(RPC);
+let signer=null, me=null, job=null, drawList=[], jobRef="", isOwner=false, isCust=false, ticker=null;
+
+$("addrOut").textContent = CONTRACT || "not deployed";
+$("netBadge").textContent = NET.label;
+if (NET.live) $("netBadge").classList.add("live");
+
+if (!CONTRACT || !RPC || !CHAIN_ID){
+  $("mainWhy").textContent = NET.label+" isn't configured yet. Fill in its entry in the NETWORKS block, or append ?net=testnet.";
+  $("mainWhy").className="why warn";
+  $("connectBtn").disabled=true; $("lookupBtn").disabled=true;
+  throw new Error("network not configured");
+}
+
+jobRef = new URLSearchParams(location.search).get("job") || "";
+if (jobRef){ $("lookupRef").value = jobRef; load(); }
+else $("mainWhy").textContent = "No job in the link. Connect to create one, or open an existing job below.";
+
+/* ---------------- read ---------------- */
+async function load(){
+  if (!jobRef) return;
+  $("jobRefOut").textContent = jobRef;
+  try{
+    const c = new ethers.Contract(CONTRACT, ABI, readProvider);
+    const j = await c.getJob(jobRef);
+    if (!j[0]){
+      job=null;
+      $("draws").innerHTML = '<div class="draw"><span class="dnum">—</span><div class="dbody"><div class="dstate warn">No job with reference "'+esc(jobRef)+'" exists on this contract.</div></div></div>';
+      ["totOut","heldOut","relOut","refOut"].forEach(k=>$(k).textContent="—");
+      return;
+    }
+    job = {
+      customer:j[1], status:Number(j[2]), total:j[3], released:j[4],
+      refunded:j[5], held:j[6], createdAt:Number(j[7]),
+      lastActivity:Number(j[8]), window:Number(j[9]), count:Number(j[10])
+    };
+    drawList = [];
+    for (let i=0;i<job.count;i++){
+      const m = await c.getMilestone(jobRef,i);
+      drawList.push({amount:m[0], state:Number(m[1]), claimedAt:Number(m[2]), releasableAt:Number(m[3])});
+    }
+    renderTotals(); renderDraws(); renderRole();
+  }catch(e){
+    console.error(e);
+    $("draws").innerHTML = '<div class="draw"><span class="dnum">—</span><div class="dbody"><div class="dstate warn">Couldn\'t reach the contract. Check the RPC — the public endpoint rate-limits under load.</div></div></div>';
+  }
+}
+
+const esc = s => String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+function renderTotals(){
+  $("totOut").textContent  = fmt(job.total);
+  $("heldOut").textContent = fmt(job.held);
+  $("relOut").textContent  = fmt(job.released);
+  $("refOut").textContent  = fmt(job.refunded);
+}
+
+function renderDraws(){
+  const rows = drawList.map((d,i)=>{
+    const n = '<span class="dnum">'+String(i+1).padStart(2,"0")+'</span>';
+    let cls="", state="", acts="";
+    const t = now();
+
+    if (d.state===M_PENDING){
+      state = job.status===J_DRAFT
+        ? '<div class="dstate">Waiting on funding before work can be billed.</div>'
+        : '<div class="dstate">Not yet billed. Nothing is owed on this draw.</div>';
+      if (isOwner && job.status===J_FUNDED)
+        acts = btn("claim",i,"Mark complete","");
+      if (isOwner && job.status===J_FUNDED)
+        acts += btn("refundMilestone",i,"Cut scope","danger");
+    }
+    else if (d.state===M_CLAIMED){
+      const left = d.releasableAt - t;
+      if (left > 0){
+        state = '<div class="dstate wait">Billed. Releases automatically in <span class="clock" data-at="'+d.releasableAt+'">'+countdown(left)+'</span> unless the customer objects.</div>';
+        if (isCust){ acts = btn("approve",i,"Approve now",""); acts += btn("object",i,"Object","danger"); }
+        else if (isOwner) acts = btn("refundMilestone",i,"Withdraw claim","danger");
+      } else {
+        state = '<div class="dstate ok">Objection window closed. Ready to release.</div>';
+        acts = btn("release",i,"Release","");
+      }
+    }
+    else if (d.state===M_DISPUTED){
+      state = '<div class="dstate warn">Frozen — the customer objected. This stays put until they approve it or the contractor returns it. There is no on-chain tiebreaker; settle it by phone.</div>';
+      if (isCust) acts = btn("approve",i,"Approve and release","");
+      if (isOwner) acts = btn("refundMilestone",i,"Return this draw","danger");
+    }
+    else if (d.state===M_RELEASED){
+      cls=" done"; state = '<div class="dstate ok">Released to Mechanical Temp.</div>';
+    }
+    else if (d.state===M_REFUNDED){
+      cls=" done"; state = '<div class="dstate">Returned to the customer.</div>';
+    }
+
+    return '<div class="draw'+cls+'">'+n+
+      '<div class="dbody"><div class="damt">'+fmt(d.amount)+' USDC</div>'+state+'</div>'+
+      '<div class="dact">'+acts+'</div></div>';
+  }).join("");
+  $("draws").innerHTML = rows;
+  $("draws").querySelectorAll("button[data-fn]").forEach(b=>{
+    b.onclick = () => act(b.dataset.fn, Number(b.dataset.i), b);
+  });
+  startTicker();
+}
+
+function btn(fn,i,label,kind){
+  return '<button class="sm '+(kind||"")+'" data-fn="'+fn+'" data-i="'+i+'">'+label+'</button>';
+}
+
+function startTicker(){
+  if (ticker) clearInterval(ticker);
+  const clocks = $("draws").querySelectorAll(".clock");
+  if (!clocks.length) return;
+  ticker = setInterval(()=>{
+    let expired=false;
+    $("draws").querySelectorAll(".clock").forEach(el=>{
+      const left = Number(el.dataset.at) - now();
+      if (left<=0){ expired=true; } else { el.textContent = countdown(left); }
+    });
+    if (expired){ clearInterval(ticker); load(); }
+  },1000);
+}
+
+/* ---------------- roles ---------------- */
+function renderRole(){
+  if (!job || !me){ return; }
+  isOwner = ownerAddr && ownerAddr.toLowerCase()===me.toLowerCase();
+  isCust  = job.customer.toLowerCase()===me.toLowerCase();
+
+  const chip = $("roleChip");
+  if (isOwner && isCust) chip.innerHTML = '<span class="role owner">Contractor + Customer</span>';
+  else if (isOwner)      chip.innerHTML = '<span class="role owner">Contractor</span>';
+  else if (isCust)       chip.innerHTML = '<span class="role cust">Customer</span>';
+  else                   chip.innerHTML = '<span class="role">Observer</span>';
+
+  const st = job.status;
+  $("fundBtn").classList.toggle("hidden", !(isCust && st===J_DRAFT));
+  if (isCust && st===J_DRAFT) $("fundBtn").textContent = "Fund escrow — "+fmt(job.total)+" USDC";
+
+  const stalled = job.lastActivity + 90*86400;
+  const canReclaim = isCust && st===J_FUNDED && now() >= stalled;
+  $("reclaimBtn").classList.toggle("hidden", !canReclaim);
+
+  let how;
+  if (isOwner && isCust) how = "This wallet is both the contractor and the customer, which only happens in testing. Every button on the sheet is available to you.";
+  else if (isOwner) how = "You mark draws complete. Each one starts the objection window; if the customer stays quiet past it, the money releases on its own.";
+  else if (isCust) how = "You fund the whole schedule once, then approve or object to each draw as it's billed. Objecting freezes that draw — it doesn't cancel the job.";
+  else how = "You're not a party to this job, so you can read it but not act on it. Anyone may call Release once a window has closed, though.";
+  $("roleHow").textContent = how;
+
+  if (st===J_DRAFT){
+    $("mainWhy").textContent = isCust
+      ? "Nothing is escrowed yet. Funding sends the full "+fmt(job.total)+" USDC into the contract, where it stays until draws are released or returned."
+      : "Waiting on the customer to fund "+fmt(job.total)+" USDC. No draw can be billed before that.";
+  } else if (st===J_CLOSED){
+    $("mainWhy").textContent = "Job closed — every draw has been released or returned. Escrow balance is zero.";
+  } else {
+    $("mainWhy").textContent = fmt(job.held)+" USDC still in escrow. Long-stop date is "+new Date(stalled*1000).toLocaleDateString()+", after which the customer can reclaim anything unreleased.";
+  }
+  $("mainWhy").className = "why";
+}
+
+/* ---------------- connect ---------------- */
+let ownerAddr = null;
+
+$("connectBtn").onclick = async () => {
+  if (!window.ethereum){
+    $("mainWhy").textContent = "No wallet in this browser. Open this page in MetaMask's browser or install a wallet extension.";
+    $("mainWhy").className="why warn"; return;
+  }
+  try{
+    await window.ethereum.request({method:"eth_requestAccounts"});
+    const net = await window.ethereum.request({method:"eth_chainId"});
+    if (parseInt(net,16)!==CHAIN_ID){
+      try{ await window.ethereum.request({method:"wallet_switchEthereumChain",params:[{chainId:ARC_PARAMS.chainId}]}); }
+      catch(err){ if(err.code===4902) await window.ethereum.request({method:"wallet_addEthereumChain",params:[ARC_PARAMS]}); else throw err; }
+    }
+    const bp = new ethers.BrowserProvider(window.ethereum);
+    signer = await bp.getSigner();
+    me = await signer.getAddress();
+    $("connectBtn").textContent = me.slice(0,6)+"…"+me.slice(-4)+" connected";
+    $("connectBtn").disabled = true;
+
+    const c = new ethers.Contract(CONTRACT, ABI, readProvider);
+    ownerAddr = await c.owner();
+    if (ownerAddr.toLowerCase()===me.toLowerCase()){
+      $("ownerPanel").classList.remove("hidden");
+      const mw = await c.minWindow();
+      $("njWin").placeholder = String(mw);
+      $("ownerWhy").textContent = "The window is how long the customer has to object after you mark a draw complete. Silence past it releases the money. This contract's minimum is "+mw+" seconds.";
+    }
+    if (job){ renderRole(); renderDraws(); }
+    else $("mainWhy").textContent = "Connected. Open a job below, or create one if you're the contractor.";
+  }catch(e){
+    $("mainWhy").textContent = "Wallet didn't connect: "+(e.shortMessage||e.message);
+    $("mainWhy").className="why warn";
+  }
+};
+
+/* ---------------- write ---------------- */
+async function act(fn, i, btnEl){
+  if (!signer){ $("mainWhy").textContent="Connect a wallet first."; $("mainWhy").className="why warn"; return; }
+  const label = btnEl.textContent;
+  btnEl.disabled = true; btnEl.textContent = "Confirm…";
+  try{
+    const c = new ethers.Contract(CONTRACT, ABI, signer);
+    const tx = await c[fn](jobRef, i);
+    btnEl.textContent = "Settling…";
+    await tx.wait();
+    await load();
+  }catch(e){
+    btnEl.disabled=false; btnEl.textContent=label;
+    $("mainWhy").textContent = explain(e);
+    $("mainWhy").className="why warn";
+  }
+}
+
+function explain(e){
+  const m = (e.shortMessage||e.message||"");
+  if (m.includes("rejected")) return "You rejected the signature. Nothing changed.";
+  if (m.includes("WindowOpen")) return "The objection window hasn't closed yet — the countdown on that draw has to reach zero first.";
+  if (m.includes("WindowClosed")) return "Too late to object; that window already closed. The draw can be released.";
+  if (m.includes("NotCustomer")) return "Only the customer wallet on this job can do that.";
+  if (m.includes("NotOwner")) return "Only the contractor wallet can do that.";
+  if (m.includes("NotFunded")) return "The escrow isn't funded yet, so there's nothing to act on.";
+  if (m.includes("TooSoonToReclaim")) return "The long-stop date hasn't passed. Reclaim only unlocks after 90 days with no activity on the job.";
+  return "Transaction failed: "+m;
+}
+
+$("fundBtn").onclick = async () => {
+  const b=$("fundBtn"); b.disabled=true; b.textContent="Confirm…";
+  try{
+    const c = new ethers.Contract(CONTRACT, ABI, signer);
+    const tx = await c.fund(jobRef, {value: job.total});
+    b.textContent="Settling…"; await tx.wait(); await load();
+    b.classList.add("hidden");
+  }catch(e){
+    b.disabled=false; b.textContent="Fund escrow — "+fmt(job.total)+" USDC";
+    $("mainWhy").textContent = explain(e); $("mainWhy").className="why warn";
+  }
+};
+
+$("reclaimBtn").onclick = async () => {
+  const b=$("reclaimBtn"); b.disabled=true; b.textContent="Confirm…";
+  try{
+    const c = new ethers.Contract(CONTRACT, ABI, signer);
+    const tx = await c.reclaim(jobRef);
+    b.textContent="Settling…"; await tx.wait(); await load();
+  }catch(e){
+    b.disabled=false; b.textContent="Reclaim unreleased funds";
+    $("mainWhy").textContent = explain(e); $("mainWhy").className="why warn";
+  }
+};
+
+/* ---------------- owner: create ---------------- */
+$("createBtn").onclick = async () => {
+  const ref=$("njRef").value.trim(), cust=$("njCust").value.trim();
+  const amts=$("njAmts").value.split(",").map(s=>s.trim()).filter(Boolean);
+  const win=parseInt($("njWin").value.trim()||$("njWin").placeholder,10);
+  if (!ref||!cust||!amts.length){ $("ownerWhy").textContent="Job reference, customer wallet and at least one draw amount are all required."; return; }
+  if (!ethers.isAddress(cust)){ $("ownerWhy").textContent="That customer wallet isn't a valid address."; return; }
+  const b=$("createBtn"); b.disabled=true; b.textContent="Confirm…";
+  try{
+    const c = new ethers.Contract(CONTRACT, ABI, signer);
+    const wei = amts.map(a=>ethers.parseUnits(a,DEC));
+    const tx = await c.createJob(ref, cust, wei, win);
+    b.textContent="Settling…"; await tx.wait();
+    const total = wei.reduce((a,x)=>a+x,0n);
+    $("ownerWhy").innerHTML = "Created "+esc(ref)+" — "+amts.length+" draws, "+fmt(total)+" USDC total. Send the customer: <code>"+location.origin+location.pathname+"?job="+encodeURIComponent(ref)+"</code>";
+  }catch(e){
+    $("ownerWhy").textContent = explain(e);
+  }finally{ b.disabled=false; b.textContent="Create job"; }
+};
+
+$("njLink").onclick = () => {
+  const r=$("njRef").value.trim()||jobRef;
+  if(!r){ $("ownerWhy").textContent="Enter a job reference first — the link needs one to point at."; return; }
+  const u=location.origin+location.pathname+"?job="+encodeURIComponent(r);
+  navigator.clipboard.writeText(u);
+  $("ownerWhy").textContent="Copied: "+u;
+};
+
+$("lookupBtn").onclick = () => {
+  const r=$("lookupRef").value.trim(); if(!r) return;
+  location.search = "?job="+encodeURIComponent(r);
+};
+</script>
+</body>
+</html>
