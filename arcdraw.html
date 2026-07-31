@@ -182,19 +182,19 @@
 const NETWORKS = {
   testnet: {
     label:"Arc Testnet", chainId:5042002,
-    rpc:"https://rpc.testnet.arc.io",
+    rpcs:["https://rpc.testnet.arc.io","https://rpc.testnet.arc.network"],
     explorer:"https://testnet.arcscan.app",
     contract:"0xb1F6c301853806C82E77f2B1B73b23264097bB98",
     decimals:18, live:false
   },
   mainnet: {
-    label:"Arc", chainId:0, rpc:"", explorer:"", contract:"",
+    label:"Arc", chainId:0, rpcs:[], explorer:"", contract:"",
     decimals:18, live:true
   }
 };
 const ACTIVE = "testnet";
 const NET = NETWORKS[new URLSearchParams(location.search).get("net")] || NETWORKS[ACTIVE];
-const CONTRACT=NET.contract, RPC=NET.rpc, CHAIN_ID=NET.chainId, EXPLORER=NET.explorer, DEC=NET.decimals;
+const CONTRACT=NET.contract, RPCS=NET.rpcs||[], CHAIN_ID=NET.chainId, EXPLORER=NET.explorer, DEC=NET.decimals;
 
 const ABI = [
   "function getJob(string) view returns (bool exists,address customer,uint8 status,uint256 total,uint256 released,uint256 refunded,uint256 held,uint64 createdAt,uint64 lastActivity,uint32 objectionWindow,uint256 milestoneCount)",
@@ -215,7 +215,7 @@ const ABI = [
 const ARC_PARAMS = {
   chainId:"0x"+CHAIN_ID.toString(16), chainName:NET.label,
   nativeCurrency:{name:"USDC",symbol:"USDC",decimals:DEC},
-  rpcUrls:[RPC], blockExplorerUrls:[EXPLORER]
+  rpcUrls:RPCS, blockExplorerUrls:[EXPLORER]
 };
 
 const M_PENDING=0, M_CLAIMED=1, M_RELEASED=2, M_DISPUTED=3, M_REFUNDED=4;
@@ -233,14 +233,27 @@ function countdown(secs){
   return m+":"+String(s).padStart(2,"0");
 }
 
-let readProvider = new ethers.JsonRpcProvider(RPC);
+/* Read through whichever endpoint answers. The public Arc RPC throttles
+   hard under load, and the wallet's own provider is usually healthy when
+   it does, so try that first once we have it. */
+const pool = RPCS.map(u => new ethers.JsonRpcProvider(u));
+let walletProvider = null;
+function readers(){ return walletProvider ? [walletProvider, ...pool] : pool; }
+async function callRead(fn){
+  let last;
+  for (const p of readers()){
+    try { return await fn(new ethers.Contract(CONTRACT, ABI, p)); }
+    catch(e){ last = e; }
+  }
+  throw last;
+}
 let signer=null, me=null, job=null, drawList=[], jobRef="", isOwner=false, isCust=false, ticker=null;
 
 $("addrOut").textContent = CONTRACT || "not deployed";
 $("netBadge").textContent = NET.label;
 if (NET.live) $("netBadge").classList.add("live");
 
-if (!CONTRACT || !RPC || !CHAIN_ID){
+if (!CONTRACT || !RPCS.length || !CHAIN_ID){
   $("mainWhy").textContent = NET.label+" isn't configured yet. Fill in its entry in the NETWORKS block, or append ?net=testnet.";
   $("mainWhy").className="why warn";
   $("connectBtn").disabled=true; $("lookupBtn").disabled=true;
@@ -256,8 +269,7 @@ async function load(){
   if (!jobRef) return;
   $("jobRefOut").textContent = jobRef;
   try{
-    const c = new ethers.Contract(CONTRACT, ABI, readProvider);
-    const j = await c.getJob(jobRef);
+    const j = await callRead(c => c.getJob(jobRef));
     if (!j[0]){
       job=null;
       $("draws").innerHTML = '<div class="draw"><span class="dnum">—</span><div class="dbody"><div class="dstate warn">No job with reference "'+esc(jobRef)+'" exists on this contract.</div></div></div>';
@@ -271,7 +283,7 @@ async function load(){
     };
     drawList = [];
     for (let i=0;i<job.count;i++){
-      const m = await c.getMilestone(jobRef,i);
+      const m = await callRead(c => c.getMilestone(jobRef,i));
       drawList.push({amount:m[0], state:Number(m[1]), claimedAt:Number(m[2]), releasableAt:Number(m[3])});
     }
     renderTotals(); renderDraws(); renderRole();
@@ -399,19 +411,35 @@ function renderRole(){
 /* ---------------- connect ---------------- */
 let ownerAddr = null;
 
-$("connectBtn").onclick = async () => {
+$("connectBtn").onclick = () => connect(false);
+
+/* If the wallet already authorized this origin, restore the session on load
+   instead of making the user click Connect again after every action. */
+(async function restore(){
+  if (!window.ethereum) return;
+  try{
+    const a = await window.ethereum.request({method:"eth_accounts"});
+    if (a && a.length) await connect(true);
+  }catch(_){}
+})();
+
+async function connect(silent){
   if (!window.ethereum){
-    $("mainWhy").textContent = "No wallet in this browser. Open this page in MetaMask's browser or install a wallet extension.";
-    $("mainWhy").className="why warn"; return;
+    if (!silent){
+      $("mainWhy").textContent = "No wallet in this browser. Open this page in MetaMask's browser or install a wallet extension.";
+      $("mainWhy").className="why warn";
+    }
+    return;
   }
   try{
-    await window.ethereum.request({method:"eth_requestAccounts"});
+    if (!silent) await window.ethereum.request({method:"eth_requestAccounts"});
     const net = await window.ethereum.request({method:"eth_chainId"});
     if (parseInt(net,16)!==CHAIN_ID){
       try{ await window.ethereum.request({method:"wallet_switchEthereumChain",params:[{chainId:ARC_PARAMS.chainId}]}); }
       catch(err){ if(err.code===4902) await window.ethereum.request({method:"wallet_addEthereumChain",params:[ARC_PARAMS]}); else throw err; }
     }
     const bp = new ethers.BrowserProvider(window.ethereum);
+    walletProvider = bp;
     signer = await bp.getSigner();
     me = await signer.getAddress();
     $("connectBtn").textContent = me.slice(0,6)+"…"+me.slice(-4)+" connected";
@@ -421,17 +449,11 @@ $("connectBtn").onclick = async () => {
     // a wallet failure. Fall back to the wallet's own provider if the
     // public endpoint is rate-limiting.
     try{
-      let c = new ethers.Contract(CONTRACT, ABI, readProvider);
-      try { ownerAddr = await c.owner(); }
-      catch(_){
-        readProvider = bp;                     // public RPC is throttled
-        c = new ethers.Contract(CONTRACT, ABI, bp);
-        ownerAddr = await c.owner();
-      }
+      ownerAddr = await callRead(c => c.owner());
       if (ownerAddr.toLowerCase()===me.toLowerCase()){
         $("ownerPanel").classList.remove("hidden");
         try{
-          const mw = await c.minWindow();
+          const mw = await callRead(c => c.minWindow());
           $("njWin").placeholder = String(mw);
           $("ownerWhy").textContent = "The window is how long the customer has to object after you mark a draw complete. Silence past it releases the money. This contract's minimum is "+mw+" seconds.";
         }catch(_){ /* cosmetic only — leave the default hint in place */ }
@@ -444,10 +466,12 @@ $("connectBtn").onclick = async () => {
       $("mainWhy").className = "why warn";
     }
   }catch(e){
-    $("mainWhy").textContent = "Wallet didn't connect: "+(e.shortMessage||e.message);
-    $("mainWhy").className="why warn";
+    if (!silent){
+      $("mainWhy").textContent = "Wallet didn't connect: "+(e.shortMessage||e.message);
+      $("mainWhy").className="why warn";
+    }
   }
-};
+}
 
 /* ---------------- write ---------------- */
 async function act(fn, i, btnEl){
@@ -517,9 +541,8 @@ $("createBtn").onclick = async () => {
     const wei = amts.map(a=>ethers.parseUnits(a,DEC));
     const tx = await c.createJob(ref, cust, wei, win);
     b.textContent="Settling…"; await tx.wait();
-    // land on the job itself — the loaded sheet is better confirmation than text
-    location.search = "?job="+encodeURIComponent(ref);
-    return;
+    openJob(ref);
+    $("ownerWhy").innerHTML = "Created "+esc(ref)+". Customer link: <code>"+location.href+"</code>";
   }catch(e){
     $("ownerWhy").textContent = explain(e);
   }finally{ b.disabled=false; b.textContent="Create job"; }
@@ -535,8 +558,16 @@ $("njLink").onclick = () => {
 
 $("lookupBtn").onclick = () => {
   const r=$("lookupRef").value.trim(); if(!r) return;
-  location.search = "?job="+encodeURIComponent(r);
+  openJob(r);
 };
+
+/* Swap jobs without reloading — a reload drops the wallet session. */
+function openJob(ref){
+  jobRef = ref;
+  $("lookupRef").value = ref;
+  history.replaceState(null, "", location.pathname+"?job="+encodeURIComponent(ref));
+  load();
+}
 </script>
 </body>
 </html>
