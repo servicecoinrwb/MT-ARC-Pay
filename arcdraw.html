@@ -332,7 +332,7 @@ function renderDraws(){
     else if (d.state===M_DISPUTED){
       state = '<div class="dstate warn">Frozen — the customer objected. This stays put until they approve it or the contractor returns it. There is no on-chain tiebreaker; settle it by phone.</div>';
       if (isCust) acts = btn("approve",i,"Approve and release","");
-      if (isOwner) acts = btn("refundMilestone",i,"Return this draw","danger");
+      if (isOwner) acts += btn("refundMilestone",i,"Return this draw","danger");
     }
     else if (d.state===M_RELEASED){
       cls=" done"; state = '<div class="dstate ok">Released to Mechanical Temp.</div>';
