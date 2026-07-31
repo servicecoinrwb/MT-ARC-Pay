@@ -297,7 +297,7 @@ const NETWORKS = {
   testnet: {
     label:    "Arc Testnet",
     chainId:  5042002,
-    rpc:      "https://rpc.testnet.arc.io",
+    rpcs:     ["https://rpc.testnet.arc.io","https://rpc.testnet.arc.network"],
     explorer: "https://testnet.arcscan.app",
     contract: "0xd435e6D506424AdA0A3BBc06e6d3E3Bf5E2C157D",
     decimals: 18,
@@ -306,7 +306,7 @@ const NETWORKS = {
   mainnet: {
     label:    "Arc",
     chainId:  0,                    // TODO: set at mainnet launch
-    rpc:      "",                   // TODO
+    rpcs:     [],                   // TODO
     explorer: "",                   // TODO
     contract: "",                   // TODO: redeploy, do not reuse testnet address
     decimals: 18,                   // TODO: verify with verifyUnits() before first invoice
@@ -318,7 +318,7 @@ const ACTIVE = "testnet";  // <-- the one line that goes to mainnet
 
 const NET = NETWORKS[new URLSearchParams(location.search).get("net")] || NETWORKS[ACTIVE];
 const CONTRACT = NET.contract;
-const RPC      = NET.rpc;
+const RPCS     = NET.rpcs || [];
 const CHAIN_ID = NET.chainId;
 const EXPLORER = NET.explorer;
 const NATIVE_DECIMALS = NET.decimals;
@@ -336,7 +336,7 @@ const ARC_PARAMS = {
   chainId: "0x" + CHAIN_ID.toString(16),
   chainName: NET.label,
   nativeCurrency: { name: "USDC", symbol: "USDC", decimals: NATIVE_DECIMALS },
-  rpcUrls: [RPC],
+  rpcUrls: RPCS,
   blockExplorerUrls: [EXPLORER]
 };
 
@@ -345,7 +345,18 @@ const $ = id => document.getElementById(id);
 const fmt = v => Number(ethers.formatUnits(v, NATIVE_DECIMALS))
   .toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-let readProvider = new ethers.JsonRpcProvider(RPC);
+/* Try every endpoint — the public Arc RPC throttles under load. */
+const pool = RPCS.map(u => new ethers.JsonRpcProvider(u));
+let walletProvider = null;
+function readers(){ return walletProvider ? [walletProvider, ...pool] : pool; }
+async function callRead(fn){
+  let last;
+  for (const p of readers()){
+    try { return await fn(new ethers.Contract(CONTRACT, ABI, p)); }
+    catch(e){ last = e; }
+  }
+  throw last;
+}
 let signer = null, current = null, invNum = "";
 
 $("addrOut").textContent = CONTRACT || "not deployed";
@@ -353,7 +364,7 @@ $("netBadge").textContent = NET.label + " · " + (CHAIN_ID || "not set");
 if (NET.live) $("netBadge").classList.add("live");
 
 /* Unconfigured network — fail loudly rather than showing an empty ticket */
-if (!CONTRACT || !RPC || !CHAIN_ID) {
+if (!CONTRACT || !RPCS.length || !CHAIN_ID) {
   $("payWhy").textContent = NET.label + " isn't configured yet. Fill in its entry in the NETWORKS block, or append ?net=testnet to this link.";
   $("payWhy").className = "why warn";
   $("connectBtn").disabled = true;
@@ -373,8 +384,7 @@ async function load() {
   if (!invNum) return;
   $("invNumOut").textContent = invNum;
   try {
-    const c = new ethers.Contract(CONTRACT, ABI, readProvider);
-    const r = await c.getInvoice(invNum);
+    const r = await callRead(c => c.getInvoice(invNum));
     current = {
       exists: r[0], voided: r[1], due: r[2], paid: r[3],
       remaining: r[4], createdAt: Number(r[5]), settledAt: Number(r[6])
@@ -425,14 +435,26 @@ function render() {
 }
 
 /* --- connect --- */
-$("connectBtn").onclick = async () => {
+$("connectBtn").onclick = () => connect(false);
+
+/* Restore an already-authorized wallet instead of demanding a reconnect. */
+(async function restore(){
+  if (!window.ethereum) return;
+  try {
+    const a = await window.ethereum.request({ method: "eth_accounts" });
+    if (a && a.length) await connect(true);
+  } catch (_) {}
+})();
+
+async function connect(silent) {
   if (!window.ethereum) {
+    if (silent) return;
     $("payWhy").textContent = "No wallet found in this browser. Open this link in MetaMask's browser, or install a wallet extension.";
     $("payWhy").className = "why warn";
     return;
   }
   try {
-    await window.ethereum.request({ method: "eth_requestAccounts" });
+    if (!silent) await window.ethereum.request({ method: "eth_requestAccounts" });
     const net = await window.ethereum.request({ method: "eth_chainId" });
     if (parseInt(net, 16) !== CHAIN_ID) {
       try {
@@ -447,13 +469,16 @@ $("connectBtn").onclick = async () => {
       }
     }
     const bp = new ethers.BrowserProvider(window.ethereum);
+    walletProvider = bp;
     signer = await bp.getSigner();
     await afterConnect();
   } catch (e) {
-    $("payWhy").textContent = "Wallet didn't connect: " + (e.shortMessage || e.message);
-    $("payWhy").className = "why warn";
+    if (!silent) {
+      $("payWhy").textContent = "Wallet didn't connect: " + (e.shortMessage || e.message);
+      $("payWhy").className = "why warn";
+    }
   }
-};
+}
 
 async function afterConnect() {
   const me = await signer.getAddress();
@@ -464,8 +489,7 @@ async function afterConnect() {
   // owner tools first — this is how the first invoice ever gets created
   let isOwner = false;
   try {
-    const c = new ethers.Contract(CONTRACT, ABI, readProvider);
-    const own = await c.owner();
+    const own = await callRead(c => c.owner());
     isOwner = own.toLowerCase() === me.toLowerCase();
     if (isOwner) $("ownerPanel").classList.remove("hidden");
   } catch (e) { console.error("owner() failed:", e); }
@@ -532,7 +556,8 @@ $("createBtn").onclick = async () => {
     const c = new ethers.Contract(CONTRACT, ABI, signer);
     const tx = await c.createInvoice(n, ethers.parseUnits(a, NATIVE_DECIMALS));
     await tx.wait();
-    $("ownerWhy").innerHTML = "Issued " + n + ". Pay link: <code>" + location.origin + location.pathname + "?inv=" + encodeURIComponent(n) + "</code>";
+    openInvoice(n);
+    $("ownerWhy").innerHTML = "Issued " + n + ". Pay link: <code>" + location.href + "</code>";
   } catch (e) {
     $("ownerWhy").textContent = "Not created: " + (e.shortMessage || e.message);
   } finally {
@@ -551,12 +576,23 @@ $("linkBtn").onclick = () => {
 $("lookupBtn").onclick = () => {
   const n = $("lookupNum").value.trim();
   if (!n) return;
-  location.search = "?inv=" + encodeURIComponent(n);
+  openInvoice(n);
 };
+
+/* Switch invoices in place — reloading would drop the wallet session. */
+function openInvoice(n){
+  invNum = n;
+  $("lookupNum").value = n;
+  history.replaceState(null, "", location.pathname + "?inv=" + encodeURIComponent(n));
+  $("stamp").classList.remove("on");
+  $("receipt").classList.add("hidden");
+  $("connectBtn").disabled = false;
+  load().then(() => { if (signer) afterConnect(); });
+}
 
 /* --- decimals sanity check, run from the console --- */
 window.verifyUnits = async (addr) => {
-  const bal = await readProvider.getBalance(addr);
+  const bal = await readers()[0].getBalance(addr);
   console.log("raw wei:", bal.toString());
   console.log("as 18dec:", ethers.formatUnits(bal, 18));
   console.log("as  6dec:", ethers.formatUnits(bal, 6));
