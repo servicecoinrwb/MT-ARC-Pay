@@ -277,7 +277,7 @@ async function load(){
     renderTotals(); renderDraws(); renderRole();
   }catch(e){
     console.error(e);
-    $("draws").innerHTML = '<div class="draw"><span class="dnum">—</span><div class="dbody"><div class="dstate warn">Couldn\'t reach the contract. Check the RPC — the public endpoint rate-limits under load.</div></div></div>';
+    $("draws").innerHTML = '<div class="draw"><span class="dnum">—</span><div class="dbody"><div class="dstate warn">Couldn\'t read this job. The public Arc RPC rate-limits under load — reload, or swap in an Alchemy endpoint in the NETWORKS block.</div></div></div>';
   }
 }
 
@@ -417,16 +417,32 @@ $("connectBtn").onclick = async () => {
     $("connectBtn").textContent = me.slice(0,6)+"…"+me.slice(-4)+" connected";
     $("connectBtn").disabled = true;
 
-    const c = new ethers.Contract(CONTRACT, ABI, readProvider);
-    ownerAddr = await c.owner();
-    if (ownerAddr.toLowerCase()===me.toLowerCase()){
-      $("ownerPanel").classList.remove("hidden");
-      const mw = await c.minWindow();
-      $("njWin").placeholder = String(mw);
-      $("ownerWhy").textContent = "The window is how long the customer has to object after you mark a draw complete. Silence past it releases the money. This contract's minimum is "+mw+" seconds.";
+    // Contract reads are separate: a throttled RPC here must not look like
+    // a wallet failure. Fall back to the wallet's own provider if the
+    // public endpoint is rate-limiting.
+    try{
+      let c = new ethers.Contract(CONTRACT, ABI, readProvider);
+      try { ownerAddr = await c.owner(); }
+      catch(_){
+        readProvider = bp;                     // public RPC is throttled
+        c = new ethers.Contract(CONTRACT, ABI, bp);
+        ownerAddr = await c.owner();
+      }
+      if (ownerAddr.toLowerCase()===me.toLowerCase()){
+        $("ownerPanel").classList.remove("hidden");
+        try{
+          const mw = await c.minWindow();
+          $("njWin").placeholder = String(mw);
+          $("ownerWhy").textContent = "The window is how long the customer has to object after you mark a draw complete. Silence past it releases the money. This contract's minimum is "+mw+" seconds.";
+        }catch(_){ /* cosmetic only — leave the default hint in place */ }
+      }
+      if (job){ renderRole(); renderDraws(); }
+      else $("mainWhy").textContent = "Connected. Open a job below, or create one if you're the contractor.";
+    }catch(e){
+      console.error(e);
+      $("mainWhy").textContent = "Wallet connected, but the contract couldn't be read. The public Arc RPC rate-limits under load — swap it for an Alchemy endpoint in the NETWORKS block if this keeps happening.";
+      $("mainWhy").className = "why warn";
     }
-    if (job){ renderRole(); renderDraws(); }
-    else $("mainWhy").textContent = "Connected. Open a job below, or create one if you're the contractor.";
   }catch(e){
     $("mainWhy").textContent = "Wallet didn't connect: "+(e.shortMessage||e.message);
     $("mainWhy").className="why warn";
