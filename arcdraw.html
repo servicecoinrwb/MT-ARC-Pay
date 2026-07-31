@@ -209,8 +209,18 @@ const ABI = [
   "function release(string,uint256)",
   "function approve(string,uint256)",
   "function refundMilestone(string,uint256)",
-  "function reclaim(string)"
+  "function reclaim(string)",
+  // custom errors — without these every revert reads "unknown custom error"
+  "error NotOwner()","error NotPendingOwner()","error NotCustomer()",
+  "error ZeroAddress()","error ZeroAmount()","error JobExists()","error NoSuchJob()",
+  "error NoSuchMilestone()","error AlreadyFunded()","error NotFunded()",
+  "error WrongAmount(uint256 sent,uint256 required)","error BadWindow()",
+  "error NoMilestones()","error TooManyMilestones()","error NotClaimable()",
+  "error NotClaimed()","error WindowOpen(uint64 releasableAt)","error WindowClosed()",
+  "error NotRefundable()","error NothingToReclaim()",
+  "error TooSoonToReclaim(uint64 reclaimableAt)","error PayoutFailed()","error Reentrant()"
 ];
+const IFACE = new ethers.Interface(ABI);
 
 const ARC_PARAMS = {
   chainId:"0x"+CHAIN_ID.toString(16), chainName:NET.label,
@@ -505,16 +515,64 @@ async function act(fn, i, btnEl){
   }
 }
 
+/* Pull the custom error out of a revert. Ethers surfaces it as e.revert when
+   the ABI knows the error; otherwise dig for raw return data and parse it.
+   Without this every contract revert reads "unknown custom error", which
+   tells the user nothing about what to do next. */
+function decodeRevert(e){
+  if (e && e.revert && e.revert.name) return e.revert;
+  const data = e?.data || e?.info?.error?.data || e?.error?.data || e?.revert?.data;
+  if (!data || typeof data !== "string") return null;
+  try { return IFACE.parseError(data); } catch(_) { return null; }
+}
+
+const ERRORS = {
+  PayoutFailed:      "The payout address can't receive funds, so the whole transaction was rolled back. Nothing moved — the money is still in escrow. Fix the treasury address and try again.",
+  WindowOpen:        "The objection window hasn't closed yet — the countdown on that draw has to reach zero first.",
+  WindowClosed:      "Too late to object; that window already closed. The draw can be released now.",
+  NotCustomer:       "Only the customer wallet on this job can do that.",
+  NotOwner:          "Only the contractor wallet can do that.",
+  NotFunded:         "The escrow isn't funded yet, so there's nothing to act on.",
+  AlreadyFunded:     "This job is already funded. It can only be funded once.",
+  TooSoonToReclaim:  "The long-stop date hasn't passed. Reclaim only unlocks after 90 days with no activity on the job.",
+  NoSuchJob:         "No job with that reference exists on this contract.",
+  NoSuchMilestone:   "That draw number isn't on this schedule.",
+  NotClaimable:      "That draw has already been billed, released or returned.",
+  NotClaimed:        "That draw hasn't been billed yet, so there's nothing to act on.",
+  NotRefundable:     "That draw is already settled — it can't be returned.",
+  NothingToReclaim:  "Everything on this job has already been released or returned.",
+  JobExists:         "A job with that reference already exists. Pick a different one.",
+  BadWindow:         "That objection window is outside the range this contract allows.",
+  ZeroAmount:        "Amount can't be zero.",
+  ZeroAddress:       "That address isn't valid.",
+  NoMilestones:      "A job needs at least one draw.",
+  TooManyMilestones: "That's more draws than the contract allows (max 20).",
+  Reentrant:         "Reentrancy guard tripped — that call can't run inside another."
+};
+
 function explain(e){
   const m = (e.shortMessage||e.message||"");
-  if (m.includes("rejected")) return "You rejected the signature. Nothing changed.";
-  if (m.includes("WindowOpen")) return "The objection window hasn't closed yet — the countdown on that draw has to reach zero first.";
-  if (m.includes("WindowClosed")) return "Too late to object; that window already closed. The draw can be released.";
-  if (m.includes("NotCustomer")) return "Only the customer wallet on this job can do that.";
-  if (m.includes("NotOwner")) return "Only the contractor wallet can do that.";
-  if (m.includes("NotFunded")) return "The escrow isn't funded yet, so there's nothing to act on.";
-  if (m.includes("TooSoonToReclaim")) return "The long-stop date hasn't passed. Reclaim only unlocks after 90 days with no activity on the job.";
-  return "Transaction failed: "+m;
+  if (m.includes("rejected") || e?.code === "ACTION_REJECTED")
+    return "You rejected the signature. Nothing changed.";
+
+  const r = decodeRevert(e);
+  if (r && ERRORS[r.name]){
+    let msg = ERRORS[r.name];
+    if (r.name === "WindowOpen" && r.args && r.args[0]){
+      msg += " Releases at " + new Date(Number(r.args[0])*1000).toLocaleTimeString() + ".";
+    }
+    if (r.name === "TooSoonToReclaim" && r.args && r.args[0]){
+      msg += " Unlocks " + new Date(Number(r.args[0])*1000).toLocaleDateString() + ".";
+    }
+    if (r.name === "WrongAmount" && r.args){
+      msg = "Funding must be the exact contract total — " + fmt(r.args[1]) + " USDC.";
+    }
+    return msg;
+  }
+  if (r) return "Transaction reverted: " + r.name;
+
+  if (m.includes("insufficient funds")) return "Not enough USDC to cover the amount plus gas.";
+  return "Transaction failed: " + m;
 }
 
 $("fundBtn").onclick = async () => {
