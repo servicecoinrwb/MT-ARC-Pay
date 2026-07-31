@@ -329,8 +329,33 @@ const ABI = [
   "function createInvoice(string,uint256)",
   "function owner() view returns (address)",
   "function paused() view returns (bool)",
-  "event InvoicePaid(bytes32 indexed id,string invNum,address indexed payer,uint256 amount,uint256 amountPaid,uint256 amountDue,bool settled)"
+  "event InvoicePaid(bytes32 indexed id,string invNum,address indexed payer,uint256 amount,uint256 amountPaid,uint256 amountDue,bool settled)",
+  "error NotOwner()","error Paused()","error ZeroAmount()","error InvoiceExists()",
+  "error NoSuchInvoice()","error InvoiceIsVoided()","error InvoiceSettled()",
+  "error Overpayment(uint256 sent,uint256 remaining)","error AlreadyPaid()",
+  "error ForwardFailed()","error Reentrant()","error ZeroAddress()"
 ];
+const IFACE = new ethers.Interface(ABI);
+
+const PAY_ERRORS = {
+  NoSuchInvoice:   "That invoice number hasn't been issued on this contract. Check it against your paper copy.",
+  InvoiceIsVoided: "This invoice was voided by Mechanical Temp and can't take payment.",
+  InvoiceSettled:  "This invoice is already paid in full. Nothing further is owed.",
+  Overpayment:     "That's more than the balance due — the contract won't take an overpayment.",
+  Paused:          "Payments are paused on this contract right now.",
+  ForwardFailed:   "The treasury address couldn't receive the payment, so the whole transaction was rolled back. Nothing left your wallet.",
+  ZeroAmount:      "Payment amount can't be zero.",
+  AlreadyPaid:     "This invoice has taken payment already and can't be voided.",
+  NotOwner:        "Only Mechanical Temp can do that.",
+  Reentrant:       "Reentrancy guard tripped — that call can't run inside another."
+};
+
+function decodeRevert(e){
+  if (e && e.revert && e.revert.name) return e.revert;
+  const data = e?.data || e?.info?.error?.data || e?.error?.data;
+  if (!data || typeof data !== "string") return null;
+  try { return IFACE.parseError(data); } catch(_) { return null; }
+}
 
 const ARC_PARAMS = {
   chainId: "0x" + CHAIN_ID.toString(16),
@@ -576,9 +601,16 @@ async function doPay() {
     btn.disabled = false;
     btn.textContent = "Pay " + fmt(payAmount) + " USDC";
     const m = e.shortMessage || e.message || "";
-    $("payWhy").textContent = m.includes("rejected")
-      ? "You rejected the signature. Nothing was charged — press Pay again when ready."
-      : "Payment didn't go through: " + m;
+    let msg;
+    if (m.includes("rejected") || e?.code === "ACTION_REJECTED") {
+      msg = "You rejected the signature. Nothing was charged — press Pay again when ready.";
+    } else {
+      const r = decodeRevert(e);
+      msg = (r && PAY_ERRORS[r.name]) ? PAY_ERRORS[r.name]
+          : r ? "Payment reverted: " + r.name
+          : "Payment didn't go through: " + m;
+    }
+    $("payWhy").textContent = msg;
     $("payWhy").className = "why warn";
   }
 }
