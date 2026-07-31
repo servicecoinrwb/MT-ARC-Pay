@@ -265,7 +265,7 @@
 /* ============================================================
    CONFIG — set these two before use
    ============================================================ */
-const CONTRACT = "0x0000000000000000000000000000000000000000"; // MTInvoiceRegistry
+const CONTRACT = "0xd435e6D506424AdA0A3BBc06e6d3E3Bf5E2C157D"; // MTInvoiceRegistry
 const RPC      = "https://rpc.testnet.arc.io";
 const CHAIN_ID = 5042002;
 const EXPLORER = "https://testnet.arcscan.app";
@@ -307,8 +307,7 @@ $("addrOut").textContent = CONTRACT;
 invNum = new URLSearchParams(location.search).get("inv") || "";
 if (invNum) { $("lookupNum").value = invNum; load(); }
 else {
-  $("payWhy").textContent = "No invoice number in the link. Enter one below, or scan the QR code on your invoice.";
-  $("connectBtn").disabled = true;
+  $("payWhy").textContent = "No invoice number in the link. Connect below to issue one, look one up, or scan the QR code on your invoice.";
 }
 
 /* --- read state from chain --- */
@@ -397,25 +396,39 @@ async function afterConnect() {
   const me = await signer.getAddress();
   const bal = await signer.provider.getBalance(me);
   const short = me.slice(0, 6) + "…" + me.slice(-4);
+  const btn = $("connectBtn");
 
-  $("connectBtn").textContent = "Pay " + fmt(current.remaining) + " USDC";
-  $("connectBtn").onclick = doPay;
+  // owner tools first — this is how the first invoice ever gets created
+  let isOwner = false;
+  try {
+    const c = new ethers.Contract(CONTRACT, ABI, readProvider);
+    const own = await c.owner();
+    isOwner = own.toLowerCase() === me.toLowerCase();
+    if (isOwner) $("ownerPanel").classList.remove("hidden");
+  } catch (e) { console.error("owner() failed:", e); }
+
+  // nothing payable loaded — connected state only
+  if (!current || !current.exists || current.voided || current.settledAt > 0) {
+    btn.disabled = true;
+    btn.textContent = "Wallet connected";
+    $("payWhy").className = "why";
+    $("payWhy").textContent = short + " · balance " + fmt(bal) + " USDC. " +
+      (isOwner ? "You're the contract owner — issue an invoice below."
+               : "Load an invoice above to pay it.");
+    return;
+  }
+
+  btn.textContent = "Pay " + fmt(current.remaining) + " USDC";
+  btn.onclick = doPay;
 
   if (bal < current.remaining) {
-    $("connectBtn").disabled = true;
+    btn.disabled = true;
     $("payWhy").textContent = short + " holds " + fmt(bal) + " USDC — not enough to cover the balance, and gas comes out of the same token. Top up at faucet.circle.com.";
     $("payWhy").className = "why warn";
   } else {
     $("payWhy").textContent = short + " · balance " + fmt(bal) + " USDC. Gas is paid in USDC too, so a few cents extra leaves the wallet.";
     $("payWhy").className = "why";
   }
-
-  // owner tools
-  try {
-    const c = new ethers.Contract(CONTRACT, ABI, readProvider);
-    const own = await c.owner();
-    if (own.toLowerCase() === me.toLowerCase()) $("ownerPanel").classList.remove("hidden");
-  } catch (_) {}
 }
 
 /* --- pay --- */
