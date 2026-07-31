@@ -358,6 +358,7 @@ async function callRead(fn){
   throw last;
 }
 let signer = null, current = null, invNum = "";
+let payAmount = 0n;   // what this wallet can actually pay right now
 
 $("addrOut").textContent = CONTRACT || "not deployed";
 $("netBadge").textContent = NET.label + " · " + (CHAIN_ID || "not set");
@@ -480,6 +481,22 @@ async function connect(silent) {
   }
 }
 
+/* Gas comes out of the same USDC balance as the payment, so a wallet holding
+   exactly the invoice amount can't cover both. Rather than showing a dead
+   button, work out what they CAN pay and offer that — the contract accepts
+   partial payments, so a penny left owing beats a failed transaction. */
+async function gasReserve() {
+  try {
+    const fee = await signer.provider.getFeeData();
+    const price = fee.maxFeePerGas || fee.gasPrice || 0n;
+    const c = new ethers.Contract(CONTRACT, ABI, signer);
+    const units = await c.pay.estimateGas(invNum, { value: 1n });
+    return (units * price * 3n) / 2n;   // 50% headroom
+  } catch (_) {
+    return ethers.parseUnits("0.05", NATIVE_DECIMALS); // conservative fallback
+  }
+}
+
 async function afterConnect() {
   const me = await signer.getAddress();
   const bal = await signer.provider.getBalance(me);
@@ -505,16 +522,31 @@ async function afterConnect() {
     return;
   }
 
-  btn.textContent = "Pay " + fmt(current.remaining) + " USDC";
   btn.onclick = doPay;
 
-  if (bal < current.remaining) {
-    btn.disabled = true;
-    $("payWhy").textContent = short + " holds " + fmt(bal) + " USDC — not enough to cover the balance, and gas comes out of the same token. Top up at faucet.circle.com.";
-    $("payWhy").className = "why warn";
-  } else {
+  const reserve = await gasReserve();
+  const spendable = bal > reserve ? bal - reserve : 0n;
+
+  if (spendable >= current.remaining) {
+    payAmount = current.remaining;
+    btn.disabled = false;
+    btn.textContent = "Pay " + fmt(payAmount) + " USDC";
     $("payWhy").textContent = short + " · balance " + fmt(bal) + " USDC. Gas is paid in USDC too, so a few cents extra leaves the wallet.";
     $("payWhy").className = "why";
+  } else if (spendable > 0n) {
+    payAmount = spendable;
+    btn.disabled = false;
+    btn.textContent = "Pay " + fmt(payAmount) + " USDC now";
+    $("payWhy").textContent = short + " holds " + fmt(bal) + " USDC, and gas comes out of that same balance — so the full " +
+      fmt(current.remaining) + " won't fit. You can pay " + fmt(payAmount) + " now, leaving " +
+      fmt(current.remaining - payAmount) + " USDC due. The invoice stays open for the rest.";
+    $("payWhy").className = "why";
+  } else {
+    payAmount = 0n;
+    btn.disabled = true;
+    btn.textContent = "Balance too low";
+    $("payWhy").textContent = short + " holds " + fmt(bal) + " USDC — not enough to cover gas, let alone the invoice. Top up at faucet.circle.com and reload.";
+    $("payWhy").className = "why warn";
   }
 }
 
@@ -524,21 +556,25 @@ async function doPay() {
   btn.disabled = true; btn.textContent = "Confirm in wallet…";
   try {
     const c = new ethers.Contract(CONTRACT, ABI, signer);
-    const tx = await c.pay(invNum, { value: current.remaining });
+    const tx = await c.pay(invNum, { value: payAmount });
     btn.textContent = "Settling…";
     $("payWhy").textContent = "Sent. Arc finalizes in under a second — waiting on the receipt.";
     const rc = await tx.wait();
-    $("stamp").classList.add("on");
+    const wasPartial = payAmount < current.remaining;
+    if (!wasPartial) $("stamp").classList.add("on");
     $("receipt").classList.remove("hidden");
     $("receiptTxt").innerHTML =
       'Paid in block ' + rc.blockNumber + '. <a href="' + EXPLORER + '/tx/' + tx.hash +
       '" target="_blank" rel="noopener">View receipt</a> — keep this hash for your records.';
-    btn.textContent = "Paid in full";
-    $("payWhy").textContent = "Funds went straight to the Mechanical Temp treasury; this contract never held them.";
+    btn.textContent = wasPartial ? "Partial payment sent" : "Paid in full";
+    $("payWhy").textContent = wasPartial
+      ? "Partial payment recorded. Reload once your balance is topped up to pay the rest — the invoice tracks what's still due."
+      : "Funds went straight to the Mechanical Temp treasury; this contract never held them.";
     await load();
+    if (signer) await afterConnect();
   } catch (e) {
     btn.disabled = false;
-    btn.textContent = "Pay " + fmt(current.remaining) + " USDC";
+    btn.textContent = "Pay " + fmt(payAmount) + " USDC";
     const m = e.shortMessage || e.message || "";
     $("payWhy").textContent = m.includes("rejected")
       ? "You rejected the signature. Nothing was charged — press Pay again when ready."
