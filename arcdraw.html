@@ -182,7 +182,7 @@
 const NETWORKS = {
   testnet: {
     label:"Arc Testnet", chainId:5042002,
-    rpcs:["https://rpc.testnet.arc.io","https://rpc.testnet.arc.network"],
+    rpcs:["https://rpc.blockdaemon.testnet.arc.network","https://arc-testnet.drpc.org","https://rpc.quicknode.testnet.arc.network","https://5042002.rpc.thirdweb.com","https://rpc.testnet.arc.network","https://rpc.testnet.arc.io"],
     explorer:"https://testnet.arcscan.app",
     contract:"0xb1F6c301853806C82E77f2B1B73b23264097bB98",
     decimals:18, live:false
@@ -286,7 +286,8 @@ async function load(){
       const m = await callRead(c => c.getMilestone(jobRef,i));
       drawList.push({amount:m[0], state:Number(m[1]), claimedAt:Number(m[2]), releasableAt:Number(m[3])});
     }
-    renderTotals(); renderDraws(); renderRole();
+    await refreshOwner();
+    renderTotals(); renderRole(); renderDraws();
   }catch(e){
     console.error(e);
     $("draws").innerHTML = '<div class="draw"><span class="dnum">—</span><div class="dbody"><div class="dstate warn">Couldn\'t read this job. The public Arc RPC rate-limits under load — reload, or swap in an Alchemy endpoint in the NETWORKS block.</div></div></div>';
@@ -370,6 +371,19 @@ function startTicker(){
 }
 
 /* ---------------- roles ---------------- */
+/* owner() can fail on a throttled endpoint during connect. Retry it on
+   every load so a single bad read doesn't leave the contractor looking
+   like a bystander for the rest of the session. */
+async function refreshOwner(){
+  if (!me || ownerAddr) return;
+  try{
+    ownerAddr = await callRead(c => c.owner());
+    if (ownerAddr.toLowerCase() === me.toLowerCase()){
+      $("ownerPanel").classList.remove("hidden");
+    }
+  }catch(_){}
+}
+
 function renderRole(){
   if (!job || !me){ return; }
   isOwner = ownerAddr && ownerAddr.toLowerCase()===me.toLowerCase();
@@ -449,9 +463,8 @@ async function connect(silent){
     // a wallet failure. Fall back to the wallet's own provider if the
     // public endpoint is rate-limiting.
     try{
-      ownerAddr = await callRead(c => c.owner());
-      if (ownerAddr.toLowerCase()===me.toLowerCase()){
-        $("ownerPanel").classList.remove("hidden");
+      await refreshOwner();
+      if (ownerAddr && ownerAddr.toLowerCase()===me.toLowerCase()){
         try{
           const mw = await callRead(c => c.minWindow());
           $("njWin").placeholder = String(mw);
@@ -459,6 +472,7 @@ async function connect(silent){
         }catch(_){ /* cosmetic only — leave the default hint in place */ }
       }
       if (job){ renderRole(); renderDraws(); }
+      else if (jobRef) load();
       else $("mainWhy").textContent = "Connected. Open a job below, or create one if you're the contractor.";
     }catch(e){
       console.error(e);
