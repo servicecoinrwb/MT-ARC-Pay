@@ -63,6 +63,15 @@
     text-decoration:none;background:var(--navy);color:var(--cream);padding:11px 18px;border-radius:3px;transition:background .15s}
   .go:hover{background:#1e3557}
   .go:focus-visible{outline:3px solid var(--sky);outline-offset:2px}
+  .use{border-top:1px dashed var(--rule);margin:16px -24px 0;padding:16px 24px 4px;background:rgba(111,183,227,.07)}
+  .use h4{font-family:"IBM Plex Mono",monospace;font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;
+    color:var(--rust);margin:0 0 9px}
+  .use p{font-size:14.5px;margin:0 0 10px;color:rgba(13,23,38,.78)}
+  .draws{width:100%;border-collapse:collapse;font-family:"IBM Plex Mono",monospace;font-size:12px;margin:0 0 10px}
+  .draws td{padding:6px 0;border-bottom:1px solid var(--rule);color:rgba(13,23,38,.72);vertical-align:top}
+  .draws tr:last-child td{border-bottom:0}
+  .draws .n{width:26px;color:rgba(13,23,38,.4)}
+  .draws .amt{text-align:right;white-space:nowrap;font-weight:600;color:var(--navy);padding-left:12px}
   .addr{font-family:"IBM Plex Mono",monospace;font-size:10.5px;color:rgba(13,23,38,.45);
     border-top:1px dashed var(--rule);padding:11px 24px;margin:0;word-break:break-all}
   .addr a{color:#1c5f88}
@@ -120,7 +129,12 @@
       <p class="sub">MTInvoiceRegistry · arcpay.html</p>
       <p>A service invoice becomes a link, the link becomes a QR code on the printed copy, and the customer pays it in one signature. USDC is Arc's native gas token, so there's no token approval and nothing to acquire first — they just pay. Settlement is final in under a second, and the contract never holds the money: every payment forwards to the treasury inside the same transaction.</p>
       <p class="live" id="liveInv">Loading…</p>
-      <a class="go" href="./arcpay.html">Open the pay page →</a>
+      <div class="use">
+        <h4>When you'd use it</h4>
+        <p>Tech finishes a no-cool call on a Saturday. Instead of leaving an invoice on the counter and chasing it for three weeks, the customer scans the QR before he's off the roof and it's settled — no card processor taking 2.9% + 30¢, no ACH wait, no "we pay on the 15th."</p>
+        <p>It's also the answer for a customer who's slow but not unwilling: the link works from a phone, at midnight, with no account to create.</p>
+      </div>
+      <a class="go" href="./arcpay.html" style="margin-top:16px">Open the pay page →</a>
     </div>
     <p class="addr">0xd435e6D506424AdA0A3BBc06e6d3E3Bf5E2C157D · <a href="https://testnet.arcscan.app/address/0xd435e6D506424AdA0A3BBc06e6d3E3Bf5E2C157D" target="_blank" rel="noopener">verified source</a></p>
   </article>
@@ -133,7 +147,19 @@
       <p class="sub">MTProgressEscrow · arcdraw.html</p>
       <p>The customer funds the whole job up front, so the money is provably there before equipment gets ordered. The contractor marks each draw complete, which starts an objection window; silence releases the draw automatically, an objection freezes it cold. There is no on-chain arbitrator, deliberately — a frozen draw stays frozen until a human relents, which makes stalemate visible instead of pretending code can settle a dispute.</p>
       <p class="live" id="liveJob">Loading…</p>
-      <a class="go" href="./arcdraw.html">Open the draw schedule →</a>
+      <div class="use">
+        <h4>When you'd use it — $38,000 RTU replacement</h4>
+        <p>You don't want to order an $18,000 rooftop unit on your own credit. The customer doesn't want to hand $18,000 to a contractor before anything shows up. Normally whoever has more leverage wins that argument. Here the money is funded up front and visible to you, but locked until work stands behind each draw:</p>
+        <table class="draws">
+          <tr><td class="n">01</td><td>Equipment ordered from the distributor</td><td class="amt">$18,000</td></tr>
+          <tr><td class="n">02</td><td>Old unit down, curb adapter set, rigging complete</td><td class="amt">$8,000</td></tr>
+          <tr><td class="n">03</td><td>New unit set, gas / electrical / controls connected</td><td class="amt">$8,000</td></tr>
+          <tr><td class="n">04</td><td>Startup, commissioning, O&amp;M turnover</td><td class="amt">$4,000</td></tr>
+        </table>
+        <p>You're not floating $18k on your own paper waiting for net-60. They're not paying for work that hasn't happened. If you walk, the long-stop returns their money without a lawyer.</p>
+        <p><b>Where it fits:</b> new commercial customers, homeowners balking at a deposit, long-lead equipment. <b>Where it doesn't:</b> an FM platform with a PO system and net-60 terms — their AP process is the thing they're protecting.</p>
+      </div>
+      <a class="go" href="./arcdraw.html" style="margin-top:16px">Open the draw schedule →</a>
     </div>
     <p class="addr">0xb1F6c301853806C82E77f2B1B73b23264097bB98 · <a href="https://testnet.arcscan.app/address/0xb1F6c301853806C82E77f2B1B73b23264097bB98" target="_blank" rel="noopener">verified source</a></p>
   </article>
@@ -146,7 +172,12 @@
       <p class="sub">ERC-4626 · Mtyld.html</p>
       <p>A USDC vault whose share price rises when Mechanical Temp reports revenue into it. Reporting mints no new shares, so nobody is diluted — the same claim is simply worth more. A permanently locked position was minted at launch and can never be redeemed by anyone, which keeps the share-price divisor from collapsing toward zero. That failure has bitten this builder before; the guard is the lesson.</p>
       <p class="live" id="liveVault">Loading…</p>
-      <a class="go" href="./Mtyld.html">Open the vault →</a>
+      <div class="use">
+        <h4>When you'd use it</h4>
+        <p>A contractor's problem is that revenue arrives in lumps and expenses don't. The usual fix is a bank line of credit at 9% that wants a personal guarantee and two years of returns.</p>
+        <p>This is the other direction: holders put USDC in, the shop reports a slice of revenue back, and the share price rises for everyone at once. No new shares are minted, so a holder's stake is never diluted — the same claim is simply worth more. Mechanical Temp earns on the 1% exit fee rather than on a spread.</p>
+      </div>
+      <a class="go" href="./Mtyld.html" style="margin-top:16px">Open the vault →</a>
     </div>
     <p class="addr">0x5a89a64D7FCfE0128d068a372c04F8B8204bDb60 · <a href="https://testnet.arcscan.app/address/0x5a89a64D7FCfE0128d068a372c04F8B8204bDb60" target="_blank" rel="noopener">verified source</a></p>
   </article>
