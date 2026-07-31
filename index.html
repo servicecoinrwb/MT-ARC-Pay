@@ -116,18 +116,18 @@
 
   /* ---------- signature: the stamp ---------- */
   .stamp{
-    position:absolute;right:20px;top:96px;
-    font-family:"Space Grotesk",sans-serif;font-weight:700;font-size:44px;
+    position:absolute;left:50%;top:62px;
+    font-family:"Space Grotesk",sans-serif;font-weight:700;font-size:40px;
     letter-spacing:.1em;color:var(--ok);border:5px solid var(--ok);
     border-radius:5px;padding:6px 16px;opacity:0;pointer-events:none;
-    transform:rotate(-13deg) scale(2.1);
+    transform:translateX(-50%) rotate(-13deg) scale(2.1);
     mix-blend-mode:multiply;
   }
   .stamp.on{animation:slam .42s cubic-bezier(.2,1.5,.4,1) forwards}
   @keyframes slam{
-    0%{opacity:0;transform:rotate(-13deg) scale(2.1)}
-    70%{opacity:.95;transform:rotate(-13deg) scale(.94)}
-    100%{opacity:.9;transform:rotate(-13deg) scale(1)}
+    0%{opacity:0;transform:translateX(-50%) rotate(-13deg) scale(2.1)}
+    70%{opacity:.95;transform:translateX(-50%) rotate(-13deg) scale(.94)}
+    100%{opacity:.9;transform:translateX(-50%) rotate(-13deg) scale(1)}
   }
 
   /* ---------- panels ---------- */
@@ -177,12 +177,18 @@
   }
   .note code{color:var(--sky)}
   @media (prefers-reduced-motion:reduce){
-    .stamp.on{animation:none;opacity:.9;transform:rotate(-13deg) scale(1)}
+    .stamp.on{animation:none;opacity:.9;transform:translateX(-50%) rotate(-13deg) scale(1)}
     *{transition:none !important}
   }
   @media (max-width:520px){
     .issuer{text-align:left}
-    .stamp{font-size:32px;top:auto;bottom:14px;right:14px}
+    .stamp{font-size:30px;top:auto;bottom:12px;left:auto;right:14px;transform:rotate(-13deg) scale(2.1)}
+    .stamp.on{animation:slamM .42s cubic-bezier(.2,1.5,.4,1) forwards}
+    @keyframes slamM{
+      0%{opacity:0;transform:rotate(-13deg) scale(2.1)}
+      70%{opacity:.95;transform:rotate(-13deg) scale(.94)}
+      100%{opacity:.9;transform:rotate(-13deg) scale(1)}
+    }
     .two{grid-template-columns:1fr}
   }
 </style>
