@@ -6,198 +6,155 @@
 <title>Pay Invoice · Mechanical Temp</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Courier+Prime:wght@400;700&family=IBM+Plex+Sans:wght@400;500;600&family=Oswald:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/ethers@6.13.4/dist/ethers.umd.min.js"></script>
 <style>
+  /* ============================================================
+     The reference object is the carbon-copy service ticket a tech
+     leaves on the counter — NCR paper, boxed fields with tiny caps
+     labels, a perforated tear edge, and a stamp when it's settled.
+     Values are typewriter; labels are printed form.
+     ============================================================ */
   :root{
     --navy:#16263f;
     --sky:#6fb7e3;
     --cream:#f5efe3;
     --rust:#b5512f;
-    --ink:#0d1726;
-    --rule:rgba(22,38,63,.16);
-    --rule-hard:rgba(22,38,63,.34);
-    --ok:#2f7d4f;
-    --paper:#fbf8f2;
+    --ink:#132033;
+    --ncr:#f8f2dd;          /* carbon copy yellow */
+    --ncr-2:#f1e9cd;
+    --rule:#c9bf9c;
+    --rule-2:#a99e78;
+    --ok:#2f6b45;
+    --stamp:#a8322f;
   }
   *{box-sizing:border-box}
   html,body{margin:0;padding:0}
   body{
     background:var(--navy);
-    background-image:
-      radial-gradient(1200px 600px at 50% -10%, rgba(111,183,227,.18), transparent 60%);
+    background-image:radial-gradient(1100px 560px at 50% -10%,rgba(111,183,227,.17),transparent 60%);
     color:var(--ink);
     font-family:"IBM Plex Sans",system-ui,sans-serif;
-    font-size:16px;
-    line-height:1.5;
-    padding:28px 16px 64px;
-    display:flex;
-    justify-content:center;
+    font-size:15.5px;line-height:1.55;
+    padding:26px 15px 70px;display:flex;justify-content:center;
   }
-  .shell{width:100%;max-width:660px}
+  .shell{width:100%;max-width:640px}
 
-  /* ---------- masthead ---------- */
-  .masthead{
-    display:flex;align-items:baseline;justify-content:space-between;
-    gap:16px;margin-bottom:14px;flex-wrap:wrap;
-  }
-  .wordmark{
-    font-family:"Space Grotesk",sans-serif;font-weight:700;
-    font-size:20px;letter-spacing:.14em;text-transform:uppercase;
-    color:var(--cream);
-  }
+  .masthead{display:flex;align-items:baseline;justify-content:space-between;gap:14px;margin-bottom:14px;flex-wrap:wrap}
+  .wordmark{font-family:"Oswald",sans-serif;font-weight:600;font-size:19px;letter-spacing:.16em;
+    text-transform:uppercase;color:var(--cream)}
   .wordmark span{color:var(--sky)}
-  .netbadge{
-    font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.08em;
-    text-transform:uppercase;color:var(--sky);
-    border:1px solid rgba(111,183,227,.42);border-radius:2px;
-    padding:4px 9px;white-space:nowrap;
-  }
+  .netbadge{font-family:"Courier Prime",monospace;font-size:11px;letter-spacing:.06em;
+    text-transform:uppercase;color:var(--sky);border:1px solid rgba(111,183,227,.42);padding:4px 9px}
+  .netbadge.live{color:var(--cream);border-color:rgba(181,81,47,.75);background:rgba(181,81,47,.28)}
 
-  /* ---------- the ticket ---------- */
-  .netbadge.live{
-    color:var(--cream);border-color:rgba(181,81,47,.75);
-    background:rgba(181,81,47,.28);
-  }
+  /* ---------- SIGNATURE: the service ticket ---------- */
   .ticket{
-    position:relative;background:var(--paper);
-    border-radius:3px;overflow:hidden;
-    box-shadow:0 22px 44px rgba(0,0,0,.34);
+    position:relative;background:var(--ncr);
+    background-image:repeating-linear-gradient(0deg,rgba(169,158,120,.05) 0 1px,transparent 1px 4px);
+    border:1px solid var(--rule-2);
+    box-shadow:0 20px 44px rgba(0,0,0,.4);
   }
+  /* perforated tear edge */
   .ticket::before{
-    content:"";position:absolute;top:0;left:0;right:0;height:7px;
-    background:
-      repeating-linear-gradient(90deg,var(--navy) 0 9px,transparent 9px 18px);
-  }
-  .ticket-head{
-    padding:26px 24px 16px;border-bottom:2px solid var(--navy);
-    display:flex;justify-content:space-between;align-items:flex-start;gap:18px;
-    flex-wrap:wrap;
-  }
-  .doctype{
-    font-family:"Space Grotesk",sans-serif;font-weight:700;
-    font-size:clamp(22px,6vw,30px);line-height:1.05;
-    letter-spacing:-.01em;color:var(--navy);margin:0;
-  }
-  .doctype small{
-    display:block;font-family:"IBM Plex Mono",monospace;font-weight:400;
-    font-size:11px;letter-spacing:.14em;text-transform:uppercase;
-    color:var(--rust);margin-bottom:7px;
-  }
-  .issuer{
-    font-family:"IBM Plex Mono",monospace;font-size:11px;line-height:1.65;
-    color:rgba(13,23,38,.62);text-align:right;
+    content:"";position:absolute;top:0;left:0;right:0;height:9px;
+    background:radial-gradient(circle at 5px 0, transparent 4px, var(--ncr) 4px);
+    background-size:11px 9px;background-position:0 -4px;
+    border-bottom:1px dashed var(--rule);
   }
 
-  /* ---------- ruled rows ---------- */
-  .rows{padding:4px 24px 8px}
-  .row{
-    display:flex;justify-content:space-between;align-items:baseline;gap:14px;
-    padding:11px 0;border-bottom:1px solid var(--rule);
-  }
-  .row:last-child{border-bottom:0}
-  .row dt{
-    font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.1em;
-    text-transform:uppercase;color:rgba(13,23,38,.55);margin:0;flex:none;
-  }
-  .row dd{
-    margin:0;font-family:"IBM Plex Mono",monospace;font-size:14px;
-    font-weight:500;text-align:right;word-break:break-all;color:var(--ink);
-  }
-  .row.total{border-top:2px solid var(--navy);border-bottom:0;margin-top:6px;padding-top:14px}
-  .row.total dt{color:var(--navy);font-weight:600}
-  .row.total dd{font-size:26px;font-weight:600;color:var(--navy)}
-  .row.total dd em{font-style:normal;font-size:13px;color:rgba(13,23,38,.5);margin-left:6px}
+  .tk-head{padding:24px 20px 13px;border-bottom:2px solid var(--navy);
+    display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap}
+  .tk-title{font-family:"Oswald",sans-serif;font-weight:600;font-size:15px;letter-spacing:.13em;
+    text-transform:uppercase;color:var(--navy);margin:0}
+  .tk-title small{display:block;font-family:"Courier Prime",monospace;font-weight:400;font-size:10.5px;
+    letter-spacing:.05em;color:rgba(19,32,51,.6);margin-top:5px;text-transform:none}
+  .tk-no{text-align:right}
+  .tk-no dt{font-family:"Oswald",sans-serif;font-size:9px;letter-spacing:.16em;text-transform:uppercase;
+    color:var(--rust);margin:0 0 3px}
+  .tk-no dd{margin:0;font-family:"Courier Prime",monospace;font-weight:700;font-size:22px;
+    color:var(--navy);letter-spacing:.02em;overflow-wrap:anywhere}
 
-  .offchain{
-    margin:0;padding:12px 24px 18px;border-top:1px dashed var(--rule);
-    font-family:"IBM Plex Mono",monospace;font-size:10.5px;line-height:1.6;
-    color:rgba(13,23,38,.5);
-  }
-  .chip{
-    display:inline-block;font-family:"IBM Plex Mono",monospace;font-size:11px;
-    letter-spacing:.08em;text-transform:uppercase;padding:3px 8px;border-radius:2px;
-  }
-  .chip.open{background:rgba(181,81,47,.12);color:var(--rust)}
-  .chip.part{background:rgba(111,183,227,.2);color:#1c5f88}
-  .chip.paid{background:rgba(47,125,79,.13);color:var(--ok)}
-  .chip.void{background:rgba(13,23,38,.09);color:rgba(13,23,38,.55)}
+  /* boxed form fields, the way a real ticket is laid out */
+  .fields{display:grid;grid-template-columns:1fr 1fr;gap:0;border-bottom:1px solid var(--rule)}
+  .fld{padding:10px 14px 9px;border-right:1px solid var(--rule);border-bottom:1px solid var(--rule);min-width:0}
+  .fld:nth-child(2n){border-right:0}
+  .fld dt{font-family:"Oswald",sans-serif;font-size:8.5px;letter-spacing:.15em;text-transform:uppercase;
+    color:rgba(19,32,51,.55);margin:0 0 4px}
+  .fld dd{margin:0;font-family:"Courier Prime",monospace;font-size:14.5px;color:var(--ink);
+    overflow-wrap:anywhere}
 
-  /* ---------- signature: the stamp ---------- */
+  /* balance due — the box that matters */
+  .balance{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;
+    padding:16px 20px;background:var(--ncr-2);border-bottom:2px solid var(--navy)}
+  .balance dt{font-family:"Oswald",sans-serif;font-size:11px;letter-spacing:.17em;text-transform:uppercase;
+    color:var(--navy);margin:0}
+  .balance dd{margin:0;font-family:"Courier Prime",monospace;font-weight:700;
+    font-size:clamp(28px,8vw,40px);line-height:1;color:var(--navy);font-variant-numeric:tabular-nums}
+  .balance dd em{font-style:normal;font-size:13px;letter-spacing:.08em;color:rgba(19,32,51,.5);margin-left:8px}
+
+  .offchain{margin:0;padding:11px 20px 15px;
+    font-family:"Courier Prime",monospace;font-size:10px;line-height:1.65;color:rgba(19,32,51,.5)}
+
+  .chip{display:inline-block;font-family:"Oswald",sans-serif;font-size:9.5px;letter-spacing:.13em;
+    text-transform:uppercase;padding:3px 8px;border:1px solid currentColor}
+  .chip.open{color:var(--rust)}
+  .chip.part{color:#1c5f88}
+  .chip.paid{color:var(--ok)}
+  .chip.void{color:rgba(19,32,51,.5)}
+
+  /* the stamp */
   .stamp{
-    position:absolute;left:50%;top:62px;
-    font-family:"Space Grotesk",sans-serif;font-weight:700;font-size:40px;
-    letter-spacing:.1em;color:var(--ok);border:5px solid var(--ok);
-    border-radius:5px;padding:6px 16px;opacity:0;pointer-events:none;
-    transform:translateX(-50%) rotate(-13deg) scale(2.1);
+    position:absolute;right:18px;top:64px;
+    font-family:"Oswald",sans-serif;font-weight:600;font-size:34px;letter-spacing:.14em;
+    color:var(--stamp);border:4px solid var(--stamp);padding:5px 15px;
+    opacity:0;pointer-events:none;transform:rotate(-11deg) scale(2);
     mix-blend-mode:multiply;
   }
-  .stamp.on{animation:slam .42s cubic-bezier(.2,1.5,.4,1) forwards}
+  .stamp.on{animation:slam .4s cubic-bezier(.2,1.5,.4,1) forwards}
   @keyframes slam{
-    0%{opacity:0;transform:translateX(-50%) rotate(-13deg) scale(2.1)}
-    70%{opacity:.95;transform:translateX(-50%) rotate(-13deg) scale(.94)}
-    100%{opacity:.9;transform:translateX(-50%) rotate(-13deg) scale(1)}
+    0%{opacity:0;transform:rotate(-11deg) scale(2)}
+    70%{opacity:.95;transform:rotate(-11deg) scale(.94)}
+    100%{opacity:.88;transform:rotate(-11deg) scale(1)}
   }
 
   /* ---------- panels ---------- */
-  .panel{
-    background:var(--paper);border-radius:3px;margin-top:14px;padding:20px 24px;
-    box-shadow:0 12px 26px rgba(0,0,0,.22);
-  }
-  .panel h2{
-    font-family:"Space Grotesk",sans-serif;font-size:15px;font-weight:700;
-    letter-spacing:.02em;margin:0 0 3px;color:var(--navy);
-  }
-  .how{
-    font-size:13px;color:rgba(13,23,38,.62);margin:0 0 15px;
-    border-left:2px solid var(--sky);padding-left:10px;
-  }
-  button{
-    font-family:"IBM Plex Sans",sans-serif;font-size:15px;font-weight:600;
-    border:0;border-radius:3px;padding:14px 20px;cursor:pointer;width:100%;
-    background:var(--navy);color:var(--cream);transition:background .15s;
-  }
-  button:hover:not(:disabled){background:#1e3557}
-  button:focus-visible{outline:3px solid var(--sky);outline-offset:2px}
-  button:disabled{background:rgba(13,23,38,.14);color:rgba(13,23,38,.45);cursor:not-allowed}
-  button.ghost{background:transparent;color:var(--navy);box-shadow:inset 0 0 0 1.5px var(--rule-hard)}
-  button.ghost:hover:not(:disabled){background:rgba(22,38,63,.06)}
-  .why{
-    font-family:"IBM Plex Mono",monospace;font-size:11.5px;line-height:1.6;
-    color:rgba(13,23,38,.6);margin:9px 0 0;
-  }
-  .why.warn{color:var(--rust)}
-  input{
-    width:100%;font-family:"IBM Plex Mono",monospace;font-size:14px;
-    padding:11px 12px;border:1.5px solid var(--rule-hard);border-radius:3px;
-    background:#fff;color:var(--ink);margin-bottom:9px;
-  }
-  input:focus-visible{outline:3px solid var(--sky);outline-offset:1px;border-color:var(--sky)}
-  .field-label{
-    font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.1em;
-    text-transform:uppercase;color:rgba(13,23,38,.55);display:block;margin-bottom:5px;
-  }
+  .panel{background:rgba(245,239,227,.05);border:1px solid rgba(245,239,227,.15);
+    margin-top:13px;padding:19px}
+  .panel h2{font-family:"Oswald",sans-serif;font-weight:600;font-size:14px;letter-spacing:.12em;
+    text-transform:uppercase;margin:0 0 4px;color:var(--cream)}
+  .how{font-size:13px;color:rgba(245,239,227,.6);margin:0 0 14px;border-left:2px solid var(--sky);padding-left:10px}
+  button{font-family:"Oswald",sans-serif;font-size:14.5px;font-weight:500;letter-spacing:.08em;
+    text-transform:uppercase;border:0;padding:13px 18px;cursor:pointer;width:100%;
+    background:var(--sky);color:#0a1a2a;transition:filter .14s}
+  button:hover:not(:disabled){filter:brightness(1.08)}
+  button:focus-visible{outline:2px solid var(--cream);outline-offset:2px}
+  button:disabled{background:rgba(245,239,227,.1);color:rgba(245,239,227,.32);cursor:not-allowed}
+  button.ghost{background:transparent;color:var(--cream);box-shadow:inset 0 0 0 1px rgba(245,239,227,.25)}
+  button.ghost:hover:not(:disabled){background:rgba(245,239,227,.06)}
+  .why{font-family:"Courier Prime",monospace;font-size:11.5px;line-height:1.65;
+    color:rgba(245,239,227,.52);margin:9px 0 0}
+  .why.warn{color:#e08a6a}
+  input{width:100%;font-family:"Courier Prime",monospace;font-size:15px;padding:11px 12px;
+    border:1px solid rgba(245,239,227,.18);background:rgba(0,0,0,.24);color:var(--cream);margin-bottom:9px}
+  input:focus-visible{outline:2px solid var(--sky);outline-offset:1px;border-color:transparent}
+  input::placeholder{color:rgba(245,239,227,.28)}
+  .field-label{font-family:"Oswald",sans-serif;font-size:9.5px;letter-spacing:.15em;
+    text-transform:uppercase;color:rgba(245,239,227,.48);display:block;margin-bottom:5px}
   .two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-  a{color:#1c5f88}
+  a{color:var(--sky)}
   .hidden{display:none !important}
-  .note{
-    font-family:"IBM Plex Mono",monospace;font-size:11px;line-height:1.65;
-    color:rgba(245,239,227,.62);margin-top:18px;text-align:center;
-  }
+  .note{font-family:"Courier Prime",monospace;font-size:10.5px;line-height:1.7;
+    color:rgba(245,239,227,.35);margin-top:20px;text-align:center}
   .note code{color:var(--sky)}
   @media (prefers-reduced-motion:reduce){
-    .stamp.on{animation:none;opacity:.9;transform:translateX(-50%) rotate(-13deg) scale(1)}
+    .stamp.on{animation:none;opacity:.88;transform:rotate(-11deg) scale(1)}
     *{transition:none !important}
   }
   @media (max-width:520px){
-    .issuer{text-align:left}
-    .stamp{font-size:30px;top:auto;bottom:12px;left:auto;right:14px;transform:rotate(-13deg) scale(2.1)}
-    .stamp.on{animation:slamM .42s cubic-bezier(.2,1.5,.4,1) forwards}
-    @keyframes slamM{
-      0%{opacity:0;transform:rotate(-13deg) scale(2.1)}
-      70%{opacity:.95;transform:rotate(-13deg) scale(.94)}
-      100%{opacity:.9;transform:rotate(-13deg) scale(1)}
-    }
+    .fields{grid-template-columns:1fr}
+    .fld{border-right:0}
+    .stamp{font-size:26px;top:auto;bottom:12px;right:12px}
     .two{grid-template-columns:1fr}
   }
 </style>
@@ -210,51 +167,53 @@
     <div class="netbadge" id="netBadge">Arc Testnet · 5042002</div>
   </div>
 
-  <!-- ================= TICKET ================= -->
+  <!-- SIGNATURE: the service ticket -->
   <section class="ticket">
     <div class="stamp" id="stamp">PAID</div>
 
-    <div class="ticket-head">
-      <h1 class="doctype"><small>Service Invoice</small><span id="invNumOut">—</span></h1>
-      <div class="issuer">
-        Mechanical Temp LLC<br>
-        23093 Telegraph Rd<br>
-        Southfield, MI<br>
-        Lic. #7117025
-      </div>
+    <div class="tk-head">
+      <h1 class="tk-title">Service Invoice
+        <small>Mechanical Temp LLC · 23093 Telegraph Rd, Southfield MI<br>
+        Lic. #7117025 · 313-282-4758</small>
+      </h1>
+      <dl class="tk-no">
+        <dt>INVNum</dt>
+        <dd id="invNumOut">—</dd>
+      </dl>
     </div>
 
-    <dl class="rows" id="rows">
-      <div class="row"><dt>Invoice Status</dt><dd id="statusOut"><span class="chip void">Not loaded</span></dd></div>
-      <div class="row"><dt>Trans Date</dt><dd id="issuedOut">—</dd></div>
-      <div class="row"><dt>Grand Total</dt><dd id="totalOut">—</dd></div>
-      <div class="row"><dt>Paid to Date</dt><dd id="paidOut">—</dd></div>
-      <div class="row"><dt>Payment Date</dt><dd id="payDateOut">—</dd></div>
-      <div class="row total"><dt>Balance Due</dt><dd id="dueOut">—<em id="dueUnit"></em></dd></div>
+    <dl class="fields">
+      <div class="fld"><dt>Invoice Status</dt><dd id="statusOut"><span class="chip void">Not loaded</span></dd></div>
+      <div class="fld"><dt>Trans Date</dt><dd id="issuedOut">—</dd></div>
+      <div class="fld"><dt>Grand Total</dt><dd id="totalOut">—</dd></div>
+      <div class="fld"><dt>Paid to Date</dt><dd id="paidOut">—</dd></div>
+      <div class="fld"><dt>Payment Date</dt><dd id="payDateOut">—</dd></div>
+      <div class="fld"><dt>Settles in</dt><dd>under one second</dd></div>
+    </dl>
+
+    <dl class="balance">
+      <dt>Balance Due</dt>
+      <dd id="dueOut">—<em id="dueUnit"></em></dd>
     </dl>
 
     <p class="offchain">Customer, Bill To, Service Address and Description stay in DSM. Only the invoice number and the money move on-chain — anything written here is public permanently.</p>
   </section>
 
-  <!-- ================= PAY ================= -->
   <section class="panel">
     <h2>Pay this invoice</h2>
-    <p class="how">USDC is Arc's native gas token, so payment is a plain transfer — no token approval, no second signature. One transaction settles in under a second.</p>
-
+    <p class="how">USDC is Arc's native gas token, so payment is a plain transfer — no token approval, no second signature.</p>
     <div id="payArea">
       <button id="connectBtn">Connect wallet</button>
       <p class="why" id="payWhy">Nothing is charged yet. The amount comes from the contract, not from this page — connecting only lets you sign.</p>
     </div>
-
     <div id="receipt" class="hidden">
       <p class="why" id="receiptTxt"></p>
     </div>
   </section>
 
-  <!-- ================= ISSUER (owner only) ================= -->
   <section class="panel hidden" id="ownerPanel">
     <h2>Issue an invoice</h2>
-    <p class="how">Visible because the connected wallet is the contract owner. Creating an invoice costs a few cents of USDC in gas and cannot be edited afterward — void and reissue instead.</p>
+    <p class="how">Visible because the connected wallet is the contract owner. An invoice can't be edited once created — void and reissue instead.</p>
     <label class="field-label" for="newNum">INVNum</label>
     <input id="newNum" placeholder="DSM-54" autocomplete="off">
     <label class="field-label" for="newAmt">Grand Total (USDC)</label>
@@ -263,13 +222,12 @@
       <button id="createBtn">Create invoice</button>
       <button id="linkBtn" class="ghost">Copy pay link</button>
     </div>
-    <p class="why" id="ownerWhy">The pay link is this page with <code>?inv=</code> appended — that string is what goes in the QR code on the printed invoice.</p>
+    <p class="why" id="ownerWhy">The pay link is this page with <code>?inv=</code> appended — that string is what goes in the QR code on the printed ticket.</p>
   </section>
 
-  <!-- ================= LOOKUP ================= -->
   <section class="panel" id="lookupPanel">
     <h2>Look up a different invoice</h2>
-    <p class="how">Reads directly from the chain. Anyone can check an invoice's balance; only the payer's wallet can pay it.</p>
+    <p class="how">Reads directly from the chain. Anyone can check a balance; only the payer's wallet can pay it.</p>
     <input id="lookupNum" placeholder="DSM-54" autocomplete="off">
     <button id="lookupBtn" class="ghost">Load invoice</button>
   </section>
@@ -428,7 +386,7 @@ function render() {
   const c = current;
   if (!c.exists) {
     $("statusOut").innerHTML = '<span class="chip void">No such invoice</span>';
-    $("dueOut").textContent = "—";
+    $("dueOut").innerHTML = '—<em id="dueUnit"></em>';
     $("payWhy").textContent = 'Invoice "' + invNum + '" has not been issued on this contract. Check the number against your paper copy.';
     $("connectBtn").disabled = true;
     return;
