@@ -6,131 +6,225 @@
 <title>MTYLD · Mechanical Temp Yield</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=Archivo+Black&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/ethers@6.13.4/dist/ethers.umd.min.js"></script>
 <style>
+  /* ============================================================
+     The reference object is an equipment nameplate — the stamped
+     metal data plate riveted to every rooftop unit. Model, charge,
+     ratings. A vault's NAV per share IS a rating, and its specs
+     read the same way, so the page is built as a plate.
+     MT brand colours, grounded in steel.
+     ============================================================ */
   :root{
-    --navy:#16263f; --sky:#6fb7e3; --cream:#f5efe3; --rust:#b5512f;
-    --ink:#0d1726; --rule:rgba(22,38,63,.16); --rule-hard:rgba(22,38,63,.34);
-    --ok:#2f7d4f; --paper:#fbf8f2; --amber:#a8761f;
-  } 
+    --navy:#16263f;
+    --sky:#6fb7e3;
+    --cream:#f5efe3;
+    --rust:#b5512f;
+    --ink:#0d1726;
+    --steel-1:#d8d4cc;
+    --steel-2:#c3bfb6;
+    --steel-3:#b0aba1;
+    --engrave:rgba(13,23,38,.55);
+    --ok:#2f6b45;
+    --line:rgba(13,23,38,.22);
+  }
   *{box-sizing:border-box}
   html,body{margin:0;padding:0}
   body{
     background:var(--navy);
-    background-image:radial-gradient(1200px 600px at 50% -10%,rgba(111,183,227,.18),transparent 60%);
-    color:var(--ink);font-family:"IBM Plex Sans",system-ui,sans-serif;
-    font-size:16px;line-height:1.5;padding:28px 16px 64px;display:flex;justify-content:center;
+    background-image:
+      repeating-linear-gradient(90deg,rgba(255,255,255,.014) 0 2px,transparent 2px 5px),
+      radial-gradient(900px 500px at 50% -8%,rgba(111,183,227,.16),transparent 62%);
+    color:var(--cream);
+    font-family:"IBM Plex Sans",system-ui,sans-serif;
+    font-size:15.5px;line-height:1.6;
+    padding:26px 15px 72px;display:flex;justify-content:center;
   }
   .shell{width:100%;max-width:680px}
-  .masthead{display:flex;align-items:baseline;justify-content:space-between;gap:16px;margin-bottom:14px;flex-wrap:wrap}
-  .wordmark{font-family:"Space Grotesk",sans-serif;font-weight:700;font-size:20px;letter-spacing:.14em;text-transform:uppercase;color:var(--cream)}
+
+  .topbar{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:16px;flex-wrap:wrap}
+  .wordmark{font-family:"Archivo Black",sans-serif;font-size:17px;letter-spacing:.14em;
+    text-transform:uppercase;color:var(--cream)}
   .wordmark span{color:var(--sky)}
-  .netbadge{font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--sky);border:1px solid rgba(111,183,227,.42);border-radius:2px;padding:4px 9px;white-space:nowrap}
-  .netbadge.live{color:var(--cream);border-color:rgba(181,81,47,.75);background:rgba(181,81,47,.28)}
+  .netbadge{font-family:"IBM Plex Mono",monospace;font-size:10px;letter-spacing:.1em;
+    text-transform:uppercase;color:var(--sky);border:1px solid rgba(111,183,227,.4);padding:4px 9px}
+  .netbadge.live{color:var(--cream);border-color:rgba(181,81,47,.75);background:rgba(181,81,47,.3)}
 
-  .sheet{position:relative;background:var(--paper);border-radius:3px;overflow:hidden;box-shadow:0 22px 44px rgba(0,0,0,.34)}
-  .sheet::before{content:"";position:absolute;top:0;left:0;right:0;height:7px;background:repeating-linear-gradient(90deg,var(--navy) 0 9px,transparent 9px 18px)}
+  /* ---------- SIGNATURE: the nameplate ---------- */
+  .plate{
+    position:relative;
+    background:
+      repeating-linear-gradient(90deg,rgba(255,255,255,.055) 0 1px,transparent 1px 3px),
+      linear-gradient(160deg,var(--steel-1) 0%,var(--steel-2) 45%,var(--steel-3) 100%);
+    color:var(--ink);
+    border:2px solid #8e8981;
+    border-radius:5px;
+    padding:22px 24px 18px;
+    box-shadow:0 22px 46px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.5);
+  }
+  /* rivets */
+  .plate::before,.plate::after{content:"";position:absolute;width:9px;height:9px;border-radius:50%;
+    background:radial-gradient(circle at 35% 30%,#f2eee7,#8d887f);
+    box-shadow:inset 0 0 0 1px rgba(0,0,0,.25);top:10px}
+  .plate::before{left:11px} .plate::after{right:11px}
+  .plate .rivets-b{position:absolute;left:0;right:0;bottom:10px;height:9px;pointer-events:none}
+  .plate .rivets-b i{position:absolute;width:9px;height:9px;border-radius:50%;
+    background:radial-gradient(circle at 35% 30%,#f2eee7,#8d887f);
+    box-shadow:inset 0 0 0 1px rgba(0,0,0,.25)}
+  .plate .rivets-b i:first-child{left:11px} .plate .rivets-b i:last-child{right:11px}
 
-  /* signature: the NAV headline */
-  .nav-head{padding:28px 24px 20px;border-bottom:2px solid var(--navy)}
-  .nav-eyebrow{font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--rust);margin:0 0 10px}
-  .pps{font-family:"Space Grotesk",sans-serif;font-weight:700;font-size:clamp(38px,11vw,60px);line-height:.95;letter-spacing:-.02em;color:var(--navy);margin:0;font-variant-numeric:tabular-nums}
-  .pps small{font-size:15px;font-weight:500;letter-spacing:.06em;color:rgba(13,23,38,.5);margin-left:8px}
-  .delta{font-family:"IBM Plex Mono",monospace;font-size:12.5px;margin-top:9px;color:rgba(13,23,38,.62)}
+  .plate-head{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;
+    flex-wrap:wrap;padding:0 6px 12px;border-bottom:2px solid var(--navy);margin-bottom:16px}
+  .maker{font-family:"Archivo Black",sans-serif;font-size:13px;letter-spacing:.13em;
+    text-transform:uppercase;color:var(--navy);margin:0}
+  .maker small{display:block;font-family:"IBM Plex Mono",monospace;font-weight:400;font-size:9.5px;
+    letter-spacing:.1em;color:var(--engrave);margin-top:4px;text-transform:none}
+  .plate-right{text-align:right;font-family:"IBM Plex Mono",monospace;font-size:10px;
+    letter-spacing:.08em;color:var(--engrave);line-height:1.7;text-transform:uppercase}
+
+  /* the stamped rating */
+  .rating{padding:2px 6px 6px}
+  .rating-lab{font-family:"IBM Plex Mono",monospace;font-size:9.5px;letter-spacing:.2em;
+    text-transform:uppercase;color:var(--engrave);margin:0 0 4px}
+  .pps{font-family:"Archivo Black",sans-serif;
+    font-size:clamp(38px,10.5vw,62px);line-height:1;letter-spacing:-.02em;color:var(--navy);
+    margin:0;font-variant-numeric:tabular-nums;
+    text-shadow:0 1px 0 rgba(255,255,255,.55), 0 -1px 0 rgba(0,0,0,.18)}
+  .pps small{font-family:"IBM Plex Mono",monospace;font-weight:500;font-size:13px;
+    letter-spacing:.1em;margin-left:9px;color:var(--engrave)}
+  .delta{font-family:"IBM Plex Sans",sans-serif;font-size:13px;color:rgba(13,23,38,.72);
+    margin:9px 0 0;max-width:56ch}
   .delta b{color:var(--ok);font-weight:600}
 
-  /* supply bar — shows locked vs circulating */
-  .bar{margin-top:18px}
-  .bar-track{height:9px;border-radius:2px;background:rgba(22,38,63,.1);overflow:hidden;display:flex}
+  /* spec grid — the nameplate rows */
+  .specs{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);
+    margin:18px 6px 0;border:1px solid var(--line)}
+  .specs > div{background:rgba(255,255,255,.24);padding:11px 10px;text-align:center}
+  .specs dt{font-family:"IBM Plex Mono",monospace;font-size:8.5px;letter-spacing:.15em;
+    text-transform:uppercase;color:var(--engrave);margin:0 0 4px}
+  .specs dd{margin:0;font-family:"IBM Plex Mono",monospace;font-size:15px;font-weight:600;color:var(--navy)}
+
+  /* supply gauge */
+  .gauge{margin:16px 6px 0}
+  .gauge-lab{display:flex;justify-content:space-between;font-family:"IBM Plex Mono",monospace;
+    font-size:8.5px;letter-spacing:.15em;text-transform:uppercase;color:var(--engrave);margin-bottom:6px}
+  .bar{height:14px;display:flex;border:1px solid var(--navy);background:rgba(255,255,255,.3)}
   .bar-lock{background:var(--navy)}
   .bar-circ{background:var(--sky)}
-  .bar-key{display:flex;gap:16px;flex-wrap:wrap;margin-top:8px;font-family:"IBM Plex Mono",monospace;font-size:10.5px;color:rgba(13,23,38,.6)}
-  .key-dot{display:inline-block;width:8px;height:8px;border-radius:1px;margin-right:5px;vertical-align:baseline}
+  .gauge-key{display:flex;gap:15px;flex-wrap:wrap;margin-top:7px;
+    font-family:"IBM Plex Mono",monospace;font-size:10px;color:rgba(13,23,38,.65)}
+  .kd{display:inline-block;width:8px;height:8px;margin-right:5px;vertical-align:0;border:1px solid var(--navy)}
   .k1{background:var(--navy)} .k2{background:var(--sky)}
 
-  .totals{display:grid;grid-template-columns:repeat(3,1fr);border-bottom:1px solid var(--rule)}
-  .tot{padding:14px 12px;border-right:1px solid var(--rule);text-align:center}
-  .tot:last-child{border-right:0}
-  .tot dt{font-family:"IBM Plex Mono",monospace;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:rgba(13,23,38,.5);margin:0 0 4px}
-  .tot dd{margin:0;font-family:"IBM Plex Mono",monospace;font-size:15px;font-weight:600}
+  .holder{margin:16px 6px 0;padding-top:13px;border-top:1px dashed var(--line)}
+  .hrow{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:5px 0;
+    font-family:"IBM Plex Mono",monospace;font-size:12px}
+  .hrow dt{color:var(--engrave);letter-spacing:.08em;text-transform:uppercase;font-size:9.5px;margin:0}
+  .hrow dd{margin:0;color:var(--navy);font-weight:600;text-align:right}
 
-  .rows{padding:4px 24px 8px}
-  .row{display:flex;justify-content:space-between;align-items:baseline;gap:14px;padding:11px 0;border-bottom:1px solid var(--rule)}
-  .row:last-child{border-bottom:0}
-  .row dt{font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:rgba(13,23,38,.55);margin:0}
-  .row dd{margin:0;font-family:"IBM Plex Mono",monospace;font-size:14px;font-weight:500;text-align:right;color:var(--ink)}
-  .offchain{margin:0;padding:12px 24px 18px;border-top:1px dashed var(--rule);font-family:"IBM Plex Mono",monospace;font-size:10.5px;line-height:1.6;color:rgba(13,23,38,.5)}
+  .navwhy{margin:16px 6px 4px;padding-top:12px;border-top:1px dashed var(--line);
+    font-family:"IBM Plex Mono",monospace;font-size:9.5px;line-height:1.7;color:rgba(13,23,38,.55)}
 
-  .panel{background:var(--paper);border-radius:3px;margin-top:14px;padding:20px 24px;box-shadow:0 12px 26px rgba(0,0,0,.22)}
-  .panel h2{font-family:"Space Grotesk",sans-serif;font-size:15px;font-weight:700;margin:0 0 3px;color:var(--navy)}
-  .how{font-size:13px;color:rgba(13,23,38,.62);margin:0 0 15px;border-left:2px solid var(--sky);padding-left:10px}
-  button{font-family:"IBM Plex Sans",sans-serif;font-size:15px;font-weight:600;border:0;border-radius:3px;padding:13px 18px;cursor:pointer;width:100%;background:var(--navy);color:var(--cream);transition:background .15s}
-  button:hover:not(:disabled){background:#1e3557}
-  button:focus-visible{outline:3px solid var(--sky);outline-offset:2px}
-  button:disabled{background:rgba(13,23,38,.14);color:rgba(13,23,38,.45);cursor:not-allowed}
-  button.ghost{background:transparent;color:var(--navy);box-shadow:inset 0 0 0 1.5px var(--rule-hard)}
-  button.ghost:hover:not(:disabled){background:rgba(22,38,63,.06)}
-  .why{font-family:"IBM Plex Mono",monospace;font-size:11.5px;line-height:1.6;color:rgba(13,23,38,.6);margin:9px 0 0}
-  .why.warn{color:var(--rust)}
-  input{width:100%;font-family:"IBM Plex Mono",monospace;font-size:15px;padding:11px 12px;border:1.5px solid var(--rule-hard);border-radius:3px;background:#fff;color:var(--ink);margin-bottom:9px}
-  input:focus-visible{outline:3px solid var(--sky);outline-offset:1px;border-color:var(--sky)}
-  .field-label{font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:rgba(13,23,38,.55);display:flex;justify-content:space-between;margin-bottom:5px}
-  .field-label a{cursor:pointer;color:#1c5f88;text-decoration:underline}
+  .chip{display:inline-block;font-family:"IBM Plex Mono",monospace;font-size:9px;letter-spacing:.12em;
+    text-transform:uppercase;padding:3px 8px;border:1px solid currentColor}
+  .chip.open{color:var(--ok)}
+  .chip.shut{color:var(--rust)}
+
+  /* ---------- panels ---------- */
+  .panel{background:rgba(245,239,227,.045);border:1px solid rgba(245,239,227,.14);
+    padding:19px;margin-top:13px}
+  .panel h2{font-family:"Archivo",sans-serif;font-weight:700;font-size:15px;letter-spacing:.06em;
+    text-transform:uppercase;margin:0 0 4px;color:var(--cream);display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+  .how{font-size:13px;color:rgba(245,239,227,.6);margin:0 0 14px;border-left:2px solid var(--sky);padding-left:10px}
+  button{font-family:"Archivo",sans-serif;font-size:14px;font-weight:600;letter-spacing:.02em;
+    border:0;padding:12px 18px;cursor:pointer;width:100%;background:var(--sky);color:#0a1a2a;transition:filter .14s}
+  button:hover:not(:disabled){filter:brightness(1.08)}
+  button:focus-visible{outline:2px solid var(--cream);outline-offset:2px}
+  button:disabled{background:rgba(245,239,227,.1);color:rgba(245,239,227,.32);cursor:not-allowed}
+  button.ghost{background:transparent;color:var(--cream);box-shadow:inset 0 0 0 1px rgba(245,239,227,.25)}
+  button.ghost:hover:not(:disabled){background:rgba(245,239,227,.06)}
+  .why{font-family:"IBM Plex Mono",monospace;font-size:11px;line-height:1.6;color:rgba(245,239,227,.5);margin:9px 0 0}
+  .why.warn{color:#e08a6a}
+  input{width:100%;font-family:"IBM Plex Mono",monospace;font-size:14.5px;padding:11px 12px;
+    border:1px solid rgba(245,239,227,.18);background:rgba(0,0,0,.24);color:var(--cream);margin-bottom:9px}
+  input:focus-visible{outline:2px solid var(--sky);outline-offset:1px;border-color:transparent}
+  input::placeholder{color:rgba(245,239,227,.28)}
+  .field-label{font-family:"IBM Plex Mono",monospace;font-size:9px;letter-spacing:.14em;
+    text-transform:uppercase;color:rgba(245,239,227,.45);display:flex;justify-content:space-between;margin-bottom:5px}
+  .field-label a{cursor:pointer;color:var(--sky);text-decoration:underline}
   .two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-  .quote{font-family:"IBM Plex Mono",monospace;font-size:12px;background:rgba(111,183,227,.12);border-radius:2px;padding:10px 12px;margin:0 0 10px;color:rgba(13,23,38,.75)}
-  .quote b{color:var(--navy)}
-  .role{font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.06em;text-transform:uppercase;padding:3px 8px;border-radius:2px;background:rgba(22,38,63,.12);color:var(--navy)}
-  .chip{display:inline-block;font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.08em;text-transform:uppercase;padding:3px 8px;border-radius:2px}
-  .chip.open{background:rgba(47,125,79,.13);color:var(--ok)}
-  .chip.shut{background:rgba(181,81,47,.12);color:var(--rust)}
-  .note{font-family:"IBM Plex Mono",monospace;font-size:11px;line-height:1.65;color:rgba(245,239,227,.62);margin-top:18px;text-align:center}
+  .quote{font-family:"IBM Plex Mono",monospace;font-size:11.5px;background:rgba(111,183,227,.1);
+    border-left:2px solid rgba(111,183,227,.5);padding:10px 12px;margin:0 0 10px;color:rgba(245,239,227,.78)}
+  .quote b{color:var(--cream)}
+  .role{font-family:"IBM Plex Mono",monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;
+    padding:3px 7px;border:1px solid rgba(245,239,227,.3);color:rgba(245,239,227,.75)}
+  .note{font-family:"IBM Plex Mono",monospace;font-size:10px;line-height:1.75;
+    color:rgba(245,239,227,.32);margin-top:20px;text-align:center}
   .note code{color:var(--sky)}
-  a{color:#1c5f88}
+  a{color:var(--sky)}
   .hidden{display:none !important}
   @media (prefers-reduced-motion:reduce){*{transition:none !important}}
-  @media (max-width:520px){ .two{grid-template-columns:1fr} .totals{grid-template-columns:1fr} .tot{border-right:0;border-bottom:1px solid var(--rule)} }
+  @media (max-width:560px){
+    .specs{grid-template-columns:1fr}
+    .two{grid-template-columns:1fr}
+    .plate-right{text-align:left}
+  }
 </style>
 </head>
 <body>
 <div class="shell">
 
-  <div class="masthead">
+  <div class="topbar">
     <div class="wordmark">Mechanical<span>Temp</span> Yield</div>
     <div class="netbadge" id="netBadge">Arc Testnet</div>
   </div>
 
-  <section class="sheet">
-    <div class="nav-head">
-      <p class="nav-eyebrow">Price per MTYLD share · <span id="statusChip"></span></p>
-      <h1 class="pps" id="ppsOut">—<small>USDC</small></h1>
-      <div class="delta" id="deltaOut">Loading vault state…</div>
-
-      <div class="bar">
-        <div class="bar-track">
-          <div class="bar-lock" id="barLock" style="width:0%"></div>
-          <div class="bar-circ" id="barCirc" style="width:0%"></div>
-        </div>
-        <div class="bar-key">
-          <span><i class="key-dot k1"></i><span id="lockPct">—</span> locked forever</span>
-          <span><i class="key-dot k2"></i><span id="circPct">—</span> redeemable</span>
-        </div>
+  <!-- SIGNATURE: the nameplate -->
+  <section class="plate">
+    <div class="plate-head">
+      <p class="maker">Mechanical Temp LLC
+        <small>23093 Telegraph Rd · Southfield MI · Lic. #7117025</small>
+      </p>
+      <div class="plate-right">
+        Vault MTYLD-01<br>
+        Denominated USDC<br>
+        <span id="statusChip"></span>
       </div>
     </div>
 
-    <dl class="totals">
-      <div class="tot"><dt>Vault assets</dt><dd id="taOut">—</dd></div>
-      <div class="tot"><dt>Capacity left</dt><dd id="capOut">—</dd></div>
-      <div class="tot"><dt>Exit fee</dt><dd id="feeOut">—</dd></div>
+    <div class="rating">
+      <p class="rating-lab">Net asset value per share</p>
+      <p class="pps" id="ppsOut">—<small>USDC</small></p>
+      <p class="delta" id="deltaOut">Reading vault state…</p>
+    </div>
+
+    <dl class="specs">
+      <div><dt>Vault assets</dt><dd id="taOut">—</dd></div>
+      <div><dt>Capacity left</dt><dd id="capOut">—</dd></div>
+      <div><dt>Exit fee</dt><dd id="feeOut">—</dd></div>
     </dl>
 
-    <dl class="rows">
-      <div class="row"><dt>Your shares</dt><dd id="myShares">—</dd></div>
-      <div class="row"><dt>Your value</dt><dd id="myValue">—</dd></div>
-      <div class="row"><dt>Wallet USDC</dt><dd id="myUsdc">—</dd></div>
+    <div class="gauge">
+      <div class="gauge-lab"><span>Share supply</span><span>Locked / redeemable</span></div>
+      <div class="bar">
+        <div class="bar-lock" id="barLock" style="width:0%"></div>
+        <div class="bar-circ" id="barCirc" style="width:0%"></div>
+      </div>
+      <div class="gauge-key">
+        <span><i class="kd k1"></i><span id="lockPct">—</span> locked forever</span>
+        <span><i class="kd k2"></i><span id="circPct">—</span> redeemable</span>
+      </div>
+    </div>
+
+    <dl class="holder">
+      <div class="hrow"><dt>Your shares</dt><dd id="myShares">—</dd></div>
+      <div class="hrow"><dt>Your value</dt><dd id="myValue">—</dd></div>
+      <div class="hrow"><dt>Wallet USDC</dt><dd id="myUsdc">—</dd></div>
     </dl>
 
-    <p class="offchain" id="navWhy">Price per share is assets divided by shares. A permanently locked position was minted at launch and can never be redeemed, so the divisor can't collapse toward zero and send this number to nonsense. That's what the bar above shows.</p>
+    <p class="navwhy" id="navWhy">Value per share is assets divided by shares. A permanently locked position was minted at launch and can never be redeemed by anyone, so the divisor can't collapse toward zero and send this rating to nonsense. The gauge above shows how much of the supply that is.</p>
+    <div class="rivets-b"><i></i><i></i></div>
   </section>
 
   <section class="panel">
@@ -142,7 +236,7 @@
 
   <section class="panel hidden" id="depositPanel">
     <h2>Deposit USDC</h2>
-    <p class="how" id="depHow">You receive MTYLD shares at the current price. Their value rises when revenue is reported into the vault.</p>
+    <p class="how" id="depHow">You receive MTYLD shares at the current value. They're worth more when revenue is reported into the vault.</p>
     <label class="field-label" for="depAmt"><span>Amount (USDC)</span><a id="depMax">use max</a></label>
     <input id="depAmt" placeholder="100.00" inputmode="decimal" autocomplete="off">
     <p class="quote" id="depQuote">Enter an amount to see what you'd receive.</p>
@@ -152,7 +246,7 @@
 
   <section class="panel hidden" id="redeemPanel">
     <h2>Redeem shares</h2>
-    <p class="how" id="redHow">Burns MTYLD and returns USDC at the current price, less the exit fee.</p>
+    <p class="how" id="redHow">Burns MTYLD and returns USDC at the current value, less the exit fee.</p>
     <label class="field-label" for="redAmt"><span>Shares to redeem</span><a id="redMax">use max</a></label>
     <input id="redAmt" placeholder="0.00" inputmode="decimal" autocomplete="off">
     <p class="quote" id="redQuote">Enter an amount to see what you'd receive.</p>
@@ -162,14 +256,14 @@
 
   <section class="panel hidden" id="ownerPanel">
     <h2>Operator <span class="role">Mechanical Temp</span></h2>
-    <p class="how">Visible because you're the vault owner. Reporting revenue raises the price for every holder — it does not mint you shares, so it can't dilute anyone.</p>
+    <p class="how">Visible because you're the vault owner. Reporting revenue lifts the value for every holder — it mints no shares, so it can't dilute anyone.</p>
 
     <label class="field-label" for="revAmt"><span>Report revenue (USDC)</span></label>
     <input id="revAmt" placeholder="250.00" inputmode="decimal" autocomplete="off">
-    <p class="quote" id="revQuote">Enter an amount to see the effect on price per share.</p>
+    <p class="quote" id="revQuote">Enter an amount to see the effect on value per share.</p>
     <button id="revBtn">Report revenue</button>
 
-    <div class="two" style="margin-top:16px">
+    <div class="two" style="margin-top:15px">
       <div>
         <label class="field-label" for="feeIn"><span>Entry fee bps</span></label>
         <input id="feeIn" placeholder="0" inputmode="numeric">
@@ -189,7 +283,7 @@
   <p class="note">
     Vault <code id="addrOut">—</code><br>
     Asset <code id="assetOut">—</code><br>
-    Verify on <a href="https://testnet.arcscan.app" target="_blank" rel="noopener">testnet.arcscan.app</a> · testnet funds only
+    <a href="https://testnet.arcscan.app" target="_blank" rel="noopener">Verify onchain</a> · unaudited · testnet funds only
   </p>
 </div>
 
