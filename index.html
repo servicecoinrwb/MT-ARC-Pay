@@ -170,12 +170,12 @@
       <div class="tool-num">03</div>
       <h2>MTYLD revenue vault</h2>
       <p class="sub">ERC-4626 · Mtyld.html</p>
-      <p>A USDC vault whose share price rises when Mechanical Temp reports revenue into it. Reporting mints no new shares, so nobody is diluted — the same claim is simply worth more. A permanently locked position was minted at launch and can never be redeemed by anyone, which keeps the share-price divisor from collapsing toward zero. That failure has bitten this builder before; the guard is the lesson.</p>
+      <p>A USDC vault whose share price rises when Mechanical Temp reports revenue into it. Deposits stay in the vault — the contract has no function that moves them anywhere else. Reporting revenue mints no new shares, so nobody is diluted; the same claim is simply worth more. A permanently locked position was minted at launch and can never be redeemed by anyone, which keeps the share-price divisor from collapsing toward zero. That failure has bitten this builder before; the guard is the lesson.</p>
       <p class="live" id="liveVault">Loading…</p>
       <div class="use">
-        <h4>When you'd use it</h4>
-        <p>A contractor's problem is that revenue arrives in lumps and expenses don't. The usual fix is a bank line of credit at 9% that wants a personal guarantee and two years of returns.</p>
-        <p>This is the other direction: holders put USDC in, the shop reports a slice of revenue back, and the share price rises for everyone at once. No new shares are minted, so a holder's stake is never diluted — the same claim is simply worth more. Mechanical Temp earns on the 1% exit fee rather than on a spread.</p>
+        <h4>What backs it</h4>
+        <p>Almost every token is backed by the expectation that someone will pay more for it later. This one is backed by rooftop units, service calls, and maintenance contracts — a licensed shop that was billing customers long before it wrote a line of Solidity.</p>
+        <p>The share price moves for exactly one reason: Mechanical Temp reports revenue into the vault. No emissions, no farming, no treasury printing tokens to pay a yield number. If the shop has a slow month, the price sits still. That's the honest version of "real yield," and it's the whole design.</p>
       </div>
       <a class="go" href="./Mtyld.html" style="margin-top:16px">Open the vault →</a>
     </div>
