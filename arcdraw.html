@@ -211,13 +211,18 @@
     .sm:nth-child(-n+2){border-bottom:1px solid var(--line)}
     .two{grid-template-columns:1fr}
   }
+
+  /* Logo replaces the typeset wordmark. The alt text keeps the brand legible
+     if the CDN is unreachable, so the header never renders empty. */
+  .wordmark img{display:block;height:26px;width:auto;max-width:min(62vw,240px)}
+  .wordmark{line-height:1}
 </style>
 </head>
 <body>
 <div class="shell">
 
   <div class="topbar">
-    <div class="wordmark">Mechanical<span>Temp</span></div>
+    <div class="wordmark"><img src="https://cdn.mechanicaltemp.com/logos/white/text/white_textlogo_transparent_background.png" alt="Mechanical Temp" onerror="this.replaceWith(document.createTextNode(this.alt))"></div>
     <div class="netbadge" id="netBadge">Arc Testnet</div>
   </div>
 
