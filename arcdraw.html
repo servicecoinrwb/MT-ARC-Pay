@@ -132,12 +132,12 @@
       <div class="draw"><span class="dnum">—</span><div class="dbody"><div class="dstate">No job loaded. Enter a job reference below.</div></div></div>
     </div>
 
-    <p class="offchain">Scope, site address and customer name stay in DSM. Only the draw amounts and their status move on-chain — anything written here is public permanently.</p>
+    <p class="offchain" id="offchainNote">Only the draw amounts and their status appear on the public ledger.</p>
   </section>
 
   <section class="panel">
-    <h2>Your position on this job <span id="roleChip"></span></h2>
-    <p class="how" id="roleHow">Connect a wallet to see which actions are yours. The contract decides this from your address — contractor, customer, or neither.</p>
+    <h2 id="posTitle">Your position on this job <span id="roleChip"></span></h2>
+    <p class="how" id="roleHow">Connect the wallet this job was set up for to see your options.</p>
     <button id="connectBtn">Connect wallet</button>
     <p class="why" id="mainWhy"></p>
     <button id="fundBtn" class="hidden" style="margin-top:10px">Fund escrow</button>
@@ -159,12 +159,12 @@
       <button id="createBtn">Create job</button>
       <button id="njLink" class="ghost">Copy job link</button>
     </div>
-    <p class="why" id="ownerWhy">The window is how long the customer has to object after you mark a draw complete. Silence past it releases the money.</p>
+    <p class="why" id="ownerWhy">The window is how long the customer has to object after you bill a draw. Silence past it releases the money.</p>
   </section>
 
   <section class="panel">
     <h2>Open a different job</h2>
-    <p class="how">Reads straight from the chain. Anyone can look at a schedule; only the parties to it can act on it.</p>
+    <p class="how">Enter a job reference to load its draw schedule. Anyone can view one; only the contractor and the customer on that job can act on it.</p>
     <input id="lookupRef" placeholder="DSM-JOB-1" autocomplete="off">
     <button id="lookupBtn" class="ghost">Load job</button>
   </section>
@@ -319,36 +319,44 @@ function renderDraws(){
     let cls="", state="", acts="";
     const t = now();
 
+    const cust = isCust && !isOwner;   // pure customer view
+
     if (d.state===M_PENDING){
       state = job.status===J_DRAFT
-        ? '<div class="dstate">Waiting on funding before work can be billed.</div>'
-        : '<div class="dstate">Not yet billed. Nothing is owed on this draw.</div>';
-      if (isOwner && job.status===J_FUNDED)
-        acts = btn("claim",i,"Mark complete","");
-      if (isOwner && job.status===J_FUNDED)
-        acts += btn("refundMilestone",i,"Cut scope","danger");
+        ? '<div class="dstate">'+(cust?'Nothing owed yet — this draw becomes billable once you fund the job.':'Waiting on funding before this draw can be billed.')+'</div>'
+        : '<div class="dstate">'+(cust?'Not billed yet. Nothing is owed on this draw.':'Not yet billed. Nothing is owed on this draw.')+'</div>';
+      if (isOwner && job.status===J_FUNDED){
+        acts  = btn("claim",i,"Bill this draw","");
+        acts += btn("refundMilestone",i,"Refund draw","danger");
+      }
     }
     else if (d.state===M_CLAIMED){
       const left = d.releasableAt - t;
       if (left > 0){
-        state = '<div class="dstate wait">Billed. Releases automatically in <span class="clock" data-at="'+d.releasableAt+'">'+countdown(left)+'</span> unless the customer objects.</div>';
+        state = cust
+          ? '<div class="dstate wait">Mechanical Temp has billed this draw. It pays out automatically in <span class="clock" data-at="'+d.releasableAt+'">'+countdown(left)+'</span> unless you object. If the work is done, you can approve it now instead of waiting.</div>'
+          : '<div class="dstate wait">Draw requested. Releases automatically in <span class="clock" data-at="'+d.releasableAt+'">'+countdown(left)+'</span> unless the customer objects.</div>';
         if (isCust){ acts = btn("approve",i,"Approve now",""); acts += btn("object",i,"Object","danger"); }
-        else if (isOwner) acts = btn("refundMilestone",i,"Withdraw claim","danger");
+        if (isOwner) acts += btn("refundMilestone",i,"Refund draw","danger");
       } else {
-        state = '<div class="dstate ok">Objection window closed. Ready to release.</div>';
+        state = cust
+          ? '<div class="dstate ok">The objection window has passed, so this draw is cleared to pay out to Mechanical Temp.</div>'
+          : '<div class="dstate ok">Objection window closed. Ready to release.</div>';
         acts = btn("release",i,"Release","");
       }
     }
     else if (d.state===M_DISPUTED){
-      state = '<div class="dstate warn">Frozen — the customer objected. This stays put until they approve it or the contractor returns it. There is no on-chain tiebreaker; settle it by phone.</div>';
+      state = cust
+        ? '<div class="dstate warn">You objected to this draw, so it\'s on hold. The money stays in escrow until you approve it or Mechanical Temp returns it. Nothing is decided automatically — call 313-282-4758 to sort it out.</div>'
+        : '<div class="dstate warn">Frozen — the customer objected. This stays put until they approve it or the contractor returns it. There is no on-chain tiebreaker; settle it by phone.</div>';
       if (isCust) acts = btn("approve",i,"Approve and release","");
-      if (isOwner) acts += btn("refundMilestone",i,"Return this draw","danger");
+      if (isOwner) acts += btn("refundMilestone",i,"Refund draw","danger");
     }
     else if (d.state===M_RELEASED){
-      cls=" done"; state = '<div class="dstate ok">Released to Mechanical Temp.</div>';
+      cls=" done"; state = '<div class="dstate ok">'+(cust?'Paid to Mechanical Temp.':'Released to Mechanical Temp.')+'</div>';
     }
     else if (d.state===M_REFUNDED){
-      cls=" done"; state = '<div class="dstate">Returned to the customer.</div>';
+      cls=" done"; state = '<div class="dstate">'+(cust?'Returned to you.':'Returned to the customer.')+'</div>';
     }
 
     return '<div class="draw'+cls+'">'+n+
@@ -399,6 +407,7 @@ function renderRole(){
   isOwner = ownerAddr && ownerAddr.toLowerCase()===me.toLowerCase();
   isCust  = job.customer.toLowerCase()===me.toLowerCase();
 
+  $("posTitle").firstChild.nodeValue = (isCust && !isOwner) ? "Where this job stands " : "Your position on this job ";
   const chip = $("roleChip");
   if (isOwner && isCust) chip.innerHTML = '<span class="role owner">Contractor + Customer</span>';
   else if (isOwner)      chip.innerHTML = '<span class="role owner">Contractor</span>';
@@ -415,19 +424,28 @@ function renderRole(){
 
   let how;
   if (isOwner && isCust) how = "This wallet is both the contractor and the customer, which only happens in testing. Every button on the sheet is available to you.";
-  else if (isOwner) how = "You mark draws complete. Each one starts the objection window; if the customer stays quiet past it, the money releases on its own.";
-  else if (isCust) how = "You fund the whole schedule once, then approve or object to each draw as it's billed. Objecting freezes that draw — it doesn't cancel the job.";
-  else how = "You're not a party to this job, so you can read it but not act on it. Anyone may call Release once a window has closed, though.";
+  else if (isOwner) how = "You bill each draw as its trigger is met — equipment ordered, rough-in done, startup complete. Billing starts the objection window; if the customer stays quiet past it, the money releases on its own.";
+  else if (isCust) how = "Mechanical Temp bills each draw as that part of the job is reached. You have a set window to approve it or raise an objection — if you say nothing, it releases automatically. Objecting holds that draw until it's sorted out; it doesn't cancel the job.";
+  else how = "You're not a party to this job, so you can read it but not act on it. Anyone may call Release once an objection window has closed, though.";
   $("roleHow").textContent = how;
+
+  // The customer is reading a document sent to them, not operator docs.
+  $("offchainNote").textContent = isCust && !isOwner
+    ? "Job details, your name and the service address are kept private. Only the draw amounts and their status appear on the public ledger."
+    : "Scope, site address and customer name stay off-chain. Only the draw amounts and their status are public, permanently.";
 
   if (st===J_DRAFT){
     $("mainWhy").textContent = isCust
-      ? "Nothing is escrowed yet. Funding sends the full "+fmt(job.total)+" USDC into the contract, where it stays until draws are released or returned."
+      ? "Nothing is held yet. Funding places the full "+fmt(job.total)+" USDC in escrow, where it stays until each draw is released to Mechanical Temp or returned to you. They can't take it early and you can't be billed for more than the total."
       : "Waiting on the customer to fund "+fmt(job.total)+" USDC. No draw can be billed before that.";
   } else if (st===J_CLOSED){
-    $("mainWhy").textContent = "Job closed — every draw has been released or returned. Escrow balance is zero.";
+    $("mainWhy").textContent = (isCust && !isOwner)
+      ? "This job is closed. Every draw has been paid out or returned to you, and nothing is left in escrow."
+      : "Job closed — every draw has been released or returned. Escrow balance is zero.";
   } else {
-    $("mainWhy").textContent = fmt(job.held)+" USDC still in escrow. Long-stop date is "+new Date(stalled*1000).toLocaleDateString()+", after which the customer can reclaim anything unreleased.";
+    $("mainWhy").textContent = (isCust && !isOwner)
+      ? fmt(job.held)+" USDC of your deposit is still held. If this job goes quiet with no activity until "+new Date(stalled*1000).toLocaleDateString()+", you can withdraw whatever hasn't been released."
+      : fmt(job.held)+" USDC still in escrow. Long-stop date is "+new Date(stalled*1000).toLocaleDateString()+", after which the customer can reclaim anything unreleased.";
   }
   $("mainWhy").className = "why";
 }
@@ -478,7 +496,7 @@ async function connect(silent){
         try{
           const mw = await callRead(c => c.minWindow());
           $("njWin").placeholder = String(mw);
-          $("ownerWhy").textContent = "The window is how long the customer has to object after you mark a draw complete. Silence past it releases the money. This contract's minimum is "+mw+" seconds.";
+          $("ownerWhy").textContent = "The window is how long the customer has to object after you bill a draw. Silence past it releases the money. This contract's minimum is "+mw+" seconds.";
         }catch(_){ /* cosmetic only — leave the default hint in place */ }
       }
       if (job){ renderRole(); renderDraws(); }
@@ -498,9 +516,34 @@ async function connect(silent){
 }
 
 /* ---------------- write ---------------- */
+/* Refunds move money and can't be undone, so they get a second click rather
+   than firing on the first. Everything else is either reversible or costs
+   nothing to repeat. */
+const CONFIRM = {};
+function needsConfirm(fn, i, btnEl){
+  if (fn !== "refundMilestone") return false;
+  const key = fn+":"+i;
+  if (CONFIRM[key]) { delete CONFIRM[key]; return false; }
+  CONFIRM[key] = true;
+  const amt = drawList[i] ? fmt(drawList[i].amount) : "";
+  btnEl.textContent = "Confirm — send "+amt+" back?";
+  $("mainWhy").textContent = "Refunding draw "+String(i+1).padStart(2,"0")+" returns "+amt+
+    " USDC to the customer and closes that draw permanently. It can't be billed again. Click once more to confirm, or anywhere else to cancel.";
+  $("mainWhy").className = "why warn";
+  setTimeout(()=>{
+    if (CONFIRM[key]){
+      delete CONFIRM[key];
+      btnEl.textContent = "Refund draw";
+      $("mainWhy").textContent = "";
+    }
+  }, 6000);
+  return true;
+}
+
 async function act(fn, i, btnEl){
   if (!signer){ $("mainWhy").textContent="Connect a wallet first."; $("mainWhy").className="why warn"; return; }
-  const label = btnEl.textContent;
+  if (needsConfirm(fn, i, btnEl)) return;
+  const label = fn === "refundMilestone" ? "Refund draw" : btnEl.textContent;
   btnEl.disabled = true; btnEl.textContent = "Confirm…";
   try{
     const c = new ethers.Contract(CONTRACT, ABI, signer);
