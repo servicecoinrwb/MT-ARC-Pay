@@ -1,0 +1,728 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Custody · refrigerant chain of custody</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@500;600;700&family=Public+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/ethers@6.13.4/dist/ethers.umd.min.js"></script>
+<style>
+  /* ============================================================
+     The shop, not an app. Steel ground, DOT-label condensed caps,
+     and the accent colour taken from the refrigerant itself —
+     cylinders are colour-coded by gas, so the page wears whatever
+     is in the can.
+     The signature is the cylinder: a drawn tank with a real fill
+     level, because "how much is in it" is the first question
+     anyone asks and the last one a logbook answers.
+     ============================================================ */
+  :root{
+    --steel:#191c1f;
+    --steel-2:#22262a;
+    --steel-3:#2c3136;
+    --bone:#e9e7e2;
+    --dim:rgba(233,231,226,.6);
+    --faint:rgba(233,231,226,.36);
+    --line:rgba(233,231,226,.12);
+    --warn:#e0703f;
+    --ok:#6fbf8f;
+    --gas:#c9c4ba;          /* overwritten per refrigerant */
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{background:var(--steel);
+    background-image:
+      repeating-linear-gradient(0deg,rgba(255,255,255,.012) 0 1px,transparent 1px 3px),
+      radial-gradient(900px 420px at 50% -6%,rgba(255,255,255,.045),transparent 65%);
+    color:var(--bone);font-family:"Public Sans",system-ui,sans-serif;
+    font-size:15.5px;line-height:1.6;padding:24px 15px 80px;display:flex;justify-content:center}
+  .shell{width:100%;max-width:700px}
+
+  .topbar{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:26px;flex-wrap:wrap}
+  .mark{font-family:"Saira Condensed",sans-serif;font-weight:700;font-size:23px;letter-spacing:.16em;
+    text-transform:uppercase}
+  .mark i{font-style:normal;color:var(--gas)}
+  .net{font-family:"IBM Plex Mono",monospace;font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;
+    color:var(--faint);border:1px solid var(--line);padding:4px 10px}
+
+  .hero{margin-bottom:22px}
+  .kicker{font-family:"IBM Plex Mono",monospace;font-size:9.5px;letter-spacing:.18em;text-transform:uppercase;
+    color:var(--faint);margin:0 0 11px}
+  h1{font-family:"Saira Condensed",sans-serif;font-weight:700;font-size:clamp(30px,7.4vw,44px);
+    line-height:1.04;letter-spacing:.005em;text-transform:uppercase;margin:0 0 10px}
+  h1 i{font-style:normal;color:var(--gas)}
+  .lede{font-size:16px;color:var(--dim);margin:0;max-width:56ch}
+
+  /* ---------- SIGNATURE: the cylinder ---------- */
+  .rig{display:grid;grid-template-columns:132px 1fr;gap:22px;background:var(--steel-2);
+    border:1px solid var(--line);padding:22px;margin:22px 0 13px}
+
+  .can{position:relative;width:106px;margin:0 auto}
+  .shoulder{height:20px;background:var(--gas);border-radius:44px 44px 6px 6px;
+    box-shadow:inset 0 -4px 8px rgba(0,0,0,.28)}
+  .valve{width:16px;height:13px;background:#8d9299;border-radius:3px 3px 0 0;margin:0 auto -2px;
+    box-shadow:inset 0 2px 0 rgba(255,255,255,.2)}
+  .body{position:relative;height:184px;background:linear-gradient(90deg,#3a4046 0%,#565d64 32%,#464d54 62%,#33383d 100%);
+    border-radius:4px 4px 12px 12px;overflow:hidden;
+    box-shadow:inset 0 0 0 1px rgba(0,0,0,.4)}
+  .fill{position:absolute;left:0;right:0;bottom:0;background:var(--gas);opacity:.85;
+    transition:height .45s cubic-bezier(.4,0,.2,1)}
+  .fill::before{content:"";position:absolute;left:0;right:0;top:0;height:3px;background:rgba(255,255,255,.35)}
+  .ticks{position:absolute;inset:0;pointer-events:none}
+  .ticks i{position:absolute;right:0;width:11px;height:1px;background:rgba(255,255,255,.24)}
+  .ticks i.q{width:19px;background:rgba(255,255,255,.4)}
+  .base{height:9px;background:#2b3035;border-radius:0 0 8px 8px;margin-top:-1px}
+  .canlab{font-family:"IBM Plex Mono",monospace;font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;
+    text-align:center;color:var(--faint);margin-top:9px}
+
+  .readout{min-width:0}
+  .rtop{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+  .serial{font-family:"Saira Condensed",sans-serif;font-weight:700;font-size:27px;letter-spacing:.03em;
+    text-transform:uppercase;margin:0;line-height:1.1;overflow-wrap:anywhere}
+  .gastag{font-family:"IBM Plex Mono",monospace;font-size:10px;letter-spacing:.13em;text-transform:uppercase;
+    color:#15181a;background:var(--gas);padding:3px 9px;white-space:nowrap}
+  .lbs{font-family:"IBM Plex Mono",monospace;font-weight:600;font-size:clamp(26px,7vw,38px);
+    line-height:1;font-variant-numeric:tabular-nums;margin:0}
+  .lbs small{font-size:13px;font-weight:400;color:var(--faint);letter-spacing:.08em;margin-left:8px}
+  .cap{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--faint);margin:6px 0 0}
+
+  .facts{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line);margin-top:16px}
+  .facts > div{background:var(--steel-2);padding:10px 11px}
+  .facts dt{font-family:"IBM Plex Mono",monospace;font-size:8.5px;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--faint);margin:0 0 3px}
+  .facts dd{margin:0;font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--bone);
+    overflow:hidden;text-overflow:ellipsis}
+
+  .recon{font-family:"IBM Plex Mono",monospace;font-size:10.5px;line-height:1.65;margin:14px 0 0;
+    padding-top:11px;border-top:1px dashed var(--line);color:var(--faint)}
+  .recon.bad{color:var(--warn)}
+  .recon.good{color:var(--ok)}
+
+  .acts{display:flex;gap:9px;flex-wrap:wrap;margin-top:15px}
+  .acts button{flex:1;min-width:140px;width:auto}
+  .acts:empty{display:none}
+
+  /* ---------- chain of custody ---------- */
+  .panel{background:var(--steel-2);border:1px solid var(--line);padding:19px;margin-bottom:13px}
+  .panel h2{font-family:"Saira Condensed",sans-serif;font-weight:700;font-size:19px;letter-spacing:.09em;
+    text-transform:uppercase;margin:0 0 4px}
+  .how{font-size:13px;color:var(--dim);margin:0 0 15px}
+
+  .chain{position:relative;padding-left:22px}
+  .chain::before{content:"";position:absolute;left:5px;top:6px;bottom:6px;width:1px;background:var(--line)}
+  .ev{position:relative;padding:0 0 15px}
+  .ev:last-child{padding-bottom:0}
+  .ev::before{content:"";position:absolute;left:-21px;top:5px;width:9px;height:9px;border-radius:50%;
+    background:var(--steel-2);border:2px solid var(--faint)}
+  .ev.in::before{border-color:var(--ok)}
+  .ev.out::before{border-color:var(--warn)}
+  .ev.hand::before{border-color:var(--gas);background:var(--gas)}
+  .ev .k{font-family:"Saira Condensed",sans-serif;font-weight:600;font-size:15px;letter-spacing:.06em;
+    text-transform:uppercase}
+  .ev .d{font-family:"IBM Plex Mono",monospace;font-size:10.5px;color:var(--faint);line-height:1.7;margin-top:2px}
+  .ev .d b{color:var(--dim);font-weight:400}
+  .ev .ref{font-family:"IBM Plex Mono",monospace;font-size:9.5px;color:rgba(233,231,226,.28);
+    word-break:break-all;margin-top:2px}
+
+  label{display:block;font-family:"IBM Plex Mono",monospace;font-size:9px;letter-spacing:.14em;
+    text-transform:uppercase;color:var(--faint);margin:0 0 6px}
+  input,select{width:100%;font-family:"IBM Plex Mono",monospace;font-size:14px;padding:10px 11px;
+    border:1px solid var(--line);background:rgba(0,0,0,.28);color:var(--bone);margin-bottom:10px}
+  input:focus-visible,select:focus-visible{outline:2px solid var(--gas);outline-offset:1px}
+  input::placeholder{color:rgba(233,231,226,.25)}
+  button{font-family:"Saira Condensed",sans-serif;font-size:15px;font-weight:600;letter-spacing:.1em;
+    text-transform:uppercase;border:0;padding:12px 17px;cursor:pointer;width:100%;
+    background:var(--gas);color:#15181a;transition:filter .14s}
+  button:hover:not(:disabled){filter:brightness(1.1)}
+  button:focus-visible{outline:2px solid var(--bone);outline-offset:2px}
+  button:disabled{background:rgba(233,231,226,.09);color:var(--faint);cursor:not-allowed}
+  button.ghost{background:transparent;color:var(--bone);box-shadow:inset 0 0 0 1px rgba(233,231,226,.22)}
+  button.ghost:hover:not(:disabled){background:rgba(233,231,226,.05)}
+  .why{font-family:"IBM Plex Mono",monospace;font-size:11px;line-height:1.65;color:var(--dim);margin:10px 0 0}
+  .why.warn{color:var(--warn)}
+  .why.ok{color:var(--ok)}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .three{display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px}
+
+  .list .row{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;
+    padding:11px 0;border-top:1px solid var(--line);cursor:pointer;font-family:"IBM Plex Mono",monospace;font-size:12px}
+  .list .row:first-child{border-top:0}
+  .list .row:hover b{color:var(--gas)}
+  .list .row b{font-weight:500;color:var(--bone)}
+  .swatch{display:inline-block;width:9px;height:9px;margin-right:6px;vertical-align:-1px}
+
+  .foot{font-family:"IBM Plex Mono",monospace;font-size:10px;line-height:1.8;color:var(--faint);
+    margin-top:22px;text-align:center}
+  .foot code{color:var(--gas)}
+  .disclaim{border-left:2px solid var(--warn);padding:2px 0 2px 14px;margin:16px 0 0;
+    font-size:12.5px;color:var(--dim)}
+  a{color:var(--gas)}
+  .hidden{display:none !important}
+  @media (max-width:600px){
+    .rig{grid-template-columns:1fr}
+    .can{margin-bottom:4px}
+    .two,.three{grid-template-columns:1fr}
+  }
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <div class="topbar">
+    <div class="mark">Cust<i>ody</i></div>
+    <div class="net" id="net">Arc Testnet</div>
+  </div>
+
+  <header class="hero">
+    <p class="kicker">Refrigerant chain of custody · testnet</p>
+    <h1>Every pound, <i>and who had it</i>.</h1>
+    <p class="lede">A paper tag falls off. A logbook is one person's handwriting. When your numbers and the reclaimer's numbers disagree, there's no third thing to check — until both ends sign the same handoff.</p>
+  </header>
+
+  <!-- SIGNATURE: the cylinder -->
+  <section class="rig" id="rig">
+    <div>
+      <div class="can">
+        <div class="valve"></div>
+        <div class="shoulder"></div>
+        <div class="body">
+          <div class="fill" id="fill" style="height:0%"></div>
+          <div class="ticks" id="ticks"></div>
+        </div>
+        <div class="base"></div>
+      </div>
+      <p class="canlab" id="canlab">no cylinder</p>
+    </div>
+
+    <div class="readout">
+      <div class="rtop">
+        <h2 class="serial" id="serial">—</h2>
+        <span class="gastag" id="gastag">—</span>
+      </div>
+      <p class="lbs" id="lbs">—<small>LB IN THE CAN</small></p>
+      <p class="cap" id="cap">Load a cylinder below, or look one up by serial.</p>
+
+      <dl class="facts">
+        <div><dt>Held by</dt><dd id="holder">—</dd></div>
+        <div><dt>Last movement</dt><dd id="lastmv">—</dd></div>
+        <div><dt>Recovered, lifetime</dt><dd id="tRec">—</dd></div>
+        <div><dt>Sent out, lifetime</dt><dd id="tOut">—</dd></div>
+      </dl>
+
+      <p class="recon" id="recon"></p>
+      <div class="acts" id="acts"></div>
+      <p class="why" id="rigWhy"></p>
+    </div>
+  </section>
+
+  <section class="panel hidden" id="movePanel">
+    <h2>Log a movement</h2>
+    <p class="how">Recovery adds to the can, charging takes out, disposition sends it to a reclaimer. Every entry is permanent.</p>
+    <div class="two">
+      <div>
+        <label for="mvAmt">Pounds</label>
+        <input id="mvAmt" placeholder="11.750" inputmode="decimal" autocomplete="off">
+      </div>
+      <div>
+        <label for="mvKind">What happened</label>
+        <select id="mvKind">
+          <option value="rec">Recovered into this cylinder</option>
+          <option value="chg">Charged out into a system</option>
+          <option value="rcl">Sent for reclamation</option>
+          <option value="dst">Sent for destruction</option>
+        </select>
+      </div>
+    </div>
+    <div id="toWrap" class="hidden">
+      <label for="mvTo">Who received it</label>
+      <input id="mvTo" placeholder="0x… reclaimer's address" autocomplete="off">
+    </div>
+    <label for="mvJob">Job reference — kept private, only its fingerprint goes on chain</label>
+    <input id="mvJob" placeholder="DSM-1042 · 14 Maple St · R-410A recovery" maxlength="120" autocomplete="off">
+    <p class="why" id="jobHash">The address and customer stay in your own records. What's published is a hash — proof the file you show later is the file you had today.</p>
+    <label for="mvNote">Note on the record (public)</label>
+    <input id="mvNote" placeholder="condenser changeout" maxlength="60" autocomplete="off">
+    <button id="mvBtn" disabled>Log it</button>
+    <p class="why" id="mvWhy"></p>
+  </section>
+
+  <section class="panel hidden" id="handPanel">
+    <h2>Hand it over</h2>
+    <p class="how">Custody doesn't move until they accept it from their own wallet. Nobody can push a cylinder onto someone who didn't take it.</p>
+    <label for="hTo">Hand to</label>
+    <input id="hTo" placeholder="0x…" autocomplete="off">
+    <button id="hBtn" class="ghost">Offer the cylinder</button>
+    <p class="why" id="hWhy"></p>
+  </section>
+
+  <section class="panel">
+    <h2>Chain of custody</h2>
+    <div class="chain" id="chain"><p class="why">Load a cylinder to see its history.</p></div>
+  </section>
+
+  <section class="panel">
+    <h2>Register a cylinder</h2>
+    <p class="how">Serial as stamped on the can. It's the lookup key, so two cylinders can't share one.</p>
+    <div class="two">
+      <div>
+        <label for="nSerial">Serial</label>
+        <input id="nSerial" placeholder="MT-RC-0114" maxlength="40" autocomplete="off">
+      </div>
+      <div>
+        <label for="nGas">Refrigerant</label>
+        <select id="nGas"></select>
+      </div>
+    </div>
+    <div class="three">
+      <div>
+        <label for="nCap">Capacity (lb)</label>
+        <input id="nCap" placeholder="30" inputmode="decimal" autocomplete="off">
+      </div>
+      <div>
+        <label for="nHas">Already in it (lb)</label>
+        <input id="nHas" placeholder="0" inputmode="decimal" autocomplete="off">
+      </div>
+      <div>
+        <label for="nNote">Note</label>
+        <input id="nNote" placeholder="new tank" maxlength="40" autocomplete="off">
+      </div>
+    </div>
+    <button id="regBtn">Connect wallet</button>
+    <p class="why" id="regWhy"></p>
+  </section>
+
+  <section class="panel">
+    <h2>Your cylinders</h2>
+    <div class="list" id="mine"><p class="why">Connect a wallet to see them.</p></div>
+  </section>
+
+  <section class="panel">
+    <h2>Look one up</h2>
+    <input id="lookup" placeholder="MT-RC-0114 — serial, or a number" autocomplete="off">
+    <button class="ghost" id="lookupBtn">Find it</button>
+  </section>
+
+  <p class="foot">
+    Contract <code id="addrOut">—</code> · <a href="https://testnet.arcscan.app" target="_blank" rel="noopener">read the source</a><br>
+    Testnet · unaudited · no admin keys
+  </p>
+  <div class="disclaim">
+    This is a corroborating record, not a compliance system. It can't verify anyone's certification, can't check that the pounds entered match the pounds recovered, and satisfies no regulator's recordkeeping requirement on its own. Keep the records you're required to keep.
+  </div>
+</div>
+
+<script>
+const NETWORKS={
+  testnet:{ label:"Arc Testnet", chainId:5042002,
+    rpcs:["https://rpc.blockdaemon.testnet.arc.network","https://arc-testnet.drpc.org","https://rpc.quicknode.testnet.arc.network","https://5042002.rpc.thirdweb.com","https://rpc.testnet.arc.network","https://rpc.testnet.arc.io"],
+    explorer:"https://testnet.arcscan.app",
+    custody:"0xD586320120C691B5BE7606fa187C063A5a8cD6D6" },
+  mainnet:{ label:"Arc", chainId:0, rpcs:[], explorer:"", custody:"" }
+};
+const ACTIVE="testnet";
+const NET=NETWORKS[new URLSearchParams(location.search).get("net")]||NETWORKS[ACTIVE];
+const CT=NET.custody, RPCS=NET.rpcs||[], CHAIN=NET.chainId, EXPLORER=NET.explorer;
+
+/* Cylinder colours follow the trade's own code, so the page wears
+   whatever gas is in the can. */
+const GASES={
+  "R-410A":"#e4a3b4", "R-22":"#a9c983", "R-134a":"#a7c9e2", "R-404A":"#e8975c",
+  "R-407C":"#b08a63", "R-32":"#8fbfd8", "R-454B":"#c4b0d6", "R-32/R-125":"#8fbfd8",
+  "R-11":"#e08a8a", "R-12":"#f0f0f0", "R-123":"#c9c4ba", "R-507":"#9fd4c0",
+  "Mixed / recovery":"#e8c547", "Other":"#c9c4ba"
+};
+
+const ABI=[
+  "function getCylinder(uint256) view returns (tuple(bool exists,bool retired,address holder,address pendingTo,string serial,string refrigerant,uint64 capacity,uint64 contents,uint64 registeredAt,uint64 lastMoveAt,uint256 entries))",
+  "function history(uint256) view returns (tuple(uint8 kind,address actor,address other,uint64 amount,uint64 at,bytes32 jobRef,string note)[])",
+  "function totals(uint256) view returns (uint256 recovered,uint256 charged,uint256 reclaimed,uint256 destroyed)",
+  "function findBySerial(string) view returns (uint256)",
+  "function cylindersOf(address) view returns (uint256[])",
+  "function nextId() view returns (uint256)",
+  "function registerCylinder(string,string,uint64,uint64,string) returns (uint256)",
+  "function recordRecovery(uint256,uint64,bytes32,string)",
+  "function recordCharge(uint256,uint64,bytes32,string)",
+  "function recordDisposition(uint256,uint64,address,bool,bytes32,string)",
+  "function proposeTransfer(uint256,address)",
+  "function acceptTransfer(uint256)",
+  "function cancelTransfer(uint256)",
+  "function retire(uint256,string)",
+  "error ZeroAddress()","error ZeroAmount()","error EmptySerial()","error CylinderExists()",
+  "error NoSuchCylinder()","error NotHolder()","error NotReceiver()","error TransferPending()",
+  "error NoTransferPending()","error SelfTransfer()",
+  "error OverCapacity(uint256 attempted,uint256 capacity)",
+  "error InsufficientContents(uint256 attempted,uint256 held)",
+  "error CylinderRetired()","error WrongRefrigerant()","error NotRegistrar()"
+];
+const IFACE=new ethers.Interface(ABI);
+const ARC={chainId:"0x"+CHAIN.toString(16),chainName:NET.label,
+  nativeCurrency:{name:"USDC",symbol:"USDC",decimals:18},rpcUrls:RPCS,blockExplorerUrls:[EXPLORER]};
+
+const KIND=["Registered","Recovered","Charged","Handed over","Received","To reclaimer","To destruction","Retired"];
+
+const $=id=>document.getElementById(id);
+const lb=v=>(Number(v)/1000).toFixed(3);
+const lb2=v=>(Number(v)/1000).toFixed(2);
+const toTh=s=>BigInt(Math.round(parseFloat(s)*1000));
+const shortA=a=>a.slice(0,6)+"…"+a.slice(-4);
+const dt=t=>new Date(Number(t)*1000).toLocaleString([], {year:"numeric",month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"});
+
+const pool=RPCS.map(u=>new ethers.JsonRpcProvider(u));
+let wp=null;
+const readers=()=>wp?[wp,...pool]:pool;
+async function rd(fn){ let e; for(const p of readers()){ try{ return await fn(new ethers.Contract(CT,ABI,p)); }catch(x){e=x;} } throw e; }
+
+let signer=null,me=null,cyl=null,log=[],tot=null,cid=0,loadToken=0;
+
+$("addrOut").textContent=CT||"not deployed";
+$("net").textContent=NET.label;
+$("nGas").innerHTML=Object.keys(GASES).map(g=>'<option value="'+g+'">'+g+'</option>').join("");
+cid=parseInt(new URLSearchParams(location.search).get("c")||"0",10)||0;
+
+// tick marks on the tank at quarters
+$("ticks").innerHTML=[...Array(9)].map((_,i)=>
+  '<i class="'+((i%2===0)?'q':'')+'" style="bottom:'+(i*12.5)+'%"></i>').join("");
+
+/* ---------------- read ---------------- */
+async function load(){
+  if(!cid) return;
+  const token=++loadToken;
+  try{
+    const v=await rd(c=>c.getCylinder(cid));
+    if(token!==loadToken) return;
+    if(!v.exists){
+      cyl=null;
+      $("serial").textContent="Not found";
+      $("cap").textContent="No cylinder at that number. Register one below.";
+      $("acts").innerHTML=""; $("movePanel").classList.add("hidden"); $("handPanel").classList.add("hidden");
+      return;
+    }
+    cyl={retired:v.retired,holder:v.holder,pendingTo:v.pendingTo,serial:v.serial,
+         gas:v.refrigerant,capacity:v.capacity,contents:v.contents,
+         registeredAt:Number(v.registeredAt),lastMoveAt:Number(v.lastMoveAt)};
+    log=await rd(c=>c.history(cid));
+    tot=await rd(c=>c.totals(cid));
+    render();
+  }catch(e){
+    if(token!==loadToken) return;
+    console.error(e);
+    $("cap").textContent="Couldn't reach the contract — the public RPCs throttle under load. Reload in a moment.";
+  }
+}
+
+function render(){
+  const colour = GASES[cyl.gas] || GASES["Other"];
+  document.documentElement.style.setProperty("--gas", colour);
+
+  const pct = Number(cyl.contents)/Number(cyl.capacity)*100;
+  $("fill").style.height=Math.min(100,pct)+"%";
+  $("canlab").textContent=pct.toFixed(0)+"% of "+lb2(cyl.capacity)+" lb";
+
+  $("serial").textContent=cyl.serial;
+  $("gastag").textContent=cyl.gas;
+  $("lbs").innerHTML=lb(cyl.contents)+'<small>LB IN THE CAN</small>';
+  $("cap").textContent="Capacity "+lb2(cyl.capacity)+" lb"+(cyl.retired?" · retired from service":"");
+
+  const isMine = me && cyl.holder.toLowerCase()===me.toLowerCase();
+  $("holder").textContent = isMine ? "you" : shortA(cyl.holder);
+  $("lastmv").textContent = dt(cyl.lastMoveAt);
+  $("tRec").textContent = lb(tot[0])+" lb";
+  $("tOut").textContent = lb(BigInt(tot[1])+BigInt(tot[2])+BigInt(tot[3]))+" lb";
+
+  // mass balance — a drift almost always means an unlogged event
+  const expect = BigInt(tot[0]) - BigInt(tot[1]) - BigInt(tot[2]) - BigInt(tot[3]);
+  const startedWith = BigInt(cyl.contents) - expect;
+  if(startedWith === 0n){
+    $("recon").className="recon good";
+    $("recon").textContent="Reconciles: "+lb(tot[0])+" recovered − "+lb(tot[1])+" charged − "+
+      lb(BigInt(tot[2])+BigInt(tot[3]))+" sent out = "+lb(cyl.contents)+" in the can.";
+  } else {
+    $("recon").className="recon";
+    $("recon").textContent="Registered holding "+lb(startedWith)+" lb, and the log accounts for every pound since.";
+  }
+
+  renderChain();
+
+  // actions
+  let a="";
+  const pending = cyl.pendingTo !== ethers.ZeroAddress;
+  if(me && pending && cyl.pendingTo.toLowerCase()===me.toLowerCase()) a+='<button id="acceptBtn">Accept custody</button>';
+  if(me && pending && (isMine || cyl.pendingTo.toLowerCase()===me.toLowerCase())) a+='<button id="cancelBtn" class="ghost">Cancel the handoff</button>';
+  if(isMine && !pending && !cyl.retired) a+='<button id="retireBtn" class="ghost">Retire this cylinder</button>';
+  $("acts").innerHTML=a;
+  if($("acceptBtn")) $("acceptBtn").onclick=doAccept;
+  if($("cancelBtn")) $("cancelBtn").onclick=doCancel;
+  if($("retireBtn")) $("retireBtn").onclick=doRetire;
+
+  const canAct = isMine && !pending && !cyl.retired;
+  $("movePanel").classList.toggle("hidden", !canAct);
+  $("handPanel").classList.toggle("hidden", !canAct);
+
+  $("rigWhy").className="why";
+  if(!me) $("rigWhy").textContent="Connect a wallet to log movements or hand it over.";
+  else if(pending && isMine) $("rigWhy").textContent="Offered to "+shortA(cyl.pendingTo)+". Nothing else can be logged until they accept or it's cancelled.";
+  else if(pending && cyl.pendingTo.toLowerCase()===me.toLowerCase()) $("rigWhy").textContent=shortA(cyl.holder)+" is handing you this cylinder with "+lb(cyl.contents)+" lb in it. Accepting puts it on your record.";
+  else if(cyl.retired) $("rigWhy").textContent="Retired from service. The history stays readable — retiring closes the record, it doesn't erase it.";
+  else if(!isMine) $("rigWhy").textContent=shortA(cyl.holder)+" holds this one. You can read the chain but not add to it.";
+  else $("rigWhy").textContent="";
+}
+
+function renderChain(){
+  if(!log.length){ $("chain").innerHTML='<p class="why">No entries yet.</p>'; return; }
+  $("chain").innerHTML = log.map(e=>{
+    const k=Number(e.kind);
+    const cls = k===1||k===4 ? "in" : (k===2||k===5||k===6) ? "out" : (k===3||k===4) ? "hand" : "";
+    const amt = e.amount>0n ? lb(e.amount)+" lb" : "";
+    let detail="";
+    if(k===0) detail="registered by "+who(e.actor)+(e.amount>0n?" holding "+amt:" empty");
+    else if(k===1) detail=amt+" recovered by "+who(e.actor);
+    else if(k===2) detail=amt+" charged out by "+who(e.actor);
+    else if(k===3) detail="handed to "+who(e.other)+" with "+amt+" in it";
+    else if(k===4) detail="received from "+who(e.other)+" with "+amt+" in it";
+    else if(k===5) detail=amt+" sent to "+who(e.other)+" for reclamation";
+    else if(k===6) detail=amt+" sent to "+who(e.other)+" for destruction";
+    else if(k===7) detail="retired by "+who(e.actor);
+    const ref = e.jobRef && e.jobRef!==ethers.ZeroHash
+      ? '<div class="ref">job ref '+e.jobRef.slice(0,18)+'…</div>' : '';
+    return '<div class="ev '+cls+'">'+
+      '<div class="k">'+KIND[k]+'</div>'+
+      '<div class="d">'+detail+'<br><b>'+dt(e.at)+'</b>'+(e.note?' · '+esc(e.note):'')+'</div>'+
+      ref+'</div>';
+  }).join("");
+}
+const who=a=>me&&a.toLowerCase()===me.toLowerCase()?"you":shortA(a);
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+async function renderMine(){
+  if(!me){ return; }
+  try{
+    const ids=await rd(c=>c.cylindersOf(me));
+    if(!ids.length){ $("mine").innerHTML='<p class="why">None yet. Register one below.</p>'; return; }
+    const seen=new Set(); const rows=[];
+    for(const i of [...ids].reverse()){
+      const id=Number(i);
+      if(seen.has(id)) continue; seen.add(id);
+      const v=await rd(c=>c.getCylinder(id));
+      if(!v.exists) continue;
+      const mineNow = v.holder.toLowerCase()===me.toLowerCase();
+      const col=GASES[v.refrigerant]||GASES["Other"];
+      rows.push('<div class="row" data-id="'+id+'">'+
+        '<span><i class="swatch" style="background:'+col+'"></i><b>'+esc(v.serial)+'</b> · '+esc(v.refrigerant)+'</span>'+
+        '<span>'+lb2(v.contents)+' / '+lb2(v.capacity)+' lb'+
+        (v.retired?' · retired':mineNow?'':' · handed on')+'</span></div>');
+    }
+    $("mine").innerHTML=rows.join("")||'<p class="why">None yet.</p>';
+    $("mine").querySelectorAll(".row").forEach(el=>el.onclick=()=>openCyl(Number(el.dataset.id)));
+  }catch(_){}
+}
+
+function openCyl(id){
+  cid=id;
+  history.replaceState(null,"",location.pathname+"?c="+id);
+  load(); window.scrollTo({top:0,behavior:"smooth"});
+}
+
+$("lookupBtn").onclick=async()=>{
+  const v=$("lookup").value.trim(); if(!v) return;
+  const n=parseInt(v,10);
+  if(!isNaN(n)&&String(n)===v){ openCyl(n); return; }
+  try{
+    const id=Number(await rd(c=>c.findBySerial(v)));
+    if(id>0) openCyl(id);
+    else { $("cap").textContent='No cylinder registered with serial "'+esc(v)+'".'; }
+  }catch(_){}
+};
+
+/* ---------------- form wiring ---------------- */
+$("mvKind").onchange=()=>{
+  const k=$("mvKind").value;
+  $("toWrap").classList.toggle("hidden", k!=="rcl"&&k!=="dst");
+  checkMove();
+};
+["mvAmt","mvTo"].forEach(id=>$(id).addEventListener("input",checkMove));
+$("mvJob").addEventListener("input",()=>{
+  const v=$("mvJob").value.trim();
+  $("jobHash").textContent = v
+    ? "Fingerprint: "+ethers.id(v).slice(0,26)+"… — that's what goes on chain, not the text."
+    : "The address and customer stay in your own records. What's published is a hash — proof the file you show later is the file you had today.";
+});
+
+function checkMove(){
+  if(!cyl) return;
+  const v=$("mvAmt").value.trim(), k=$("mvKind").value;
+  if(!v||isNaN(v)||Number(v)<=0){ $("mvWhy").textContent=""; $("mvBtn").disabled=true; return; }
+  let amt; try{ amt=toTh(v); }catch{ return; }
+  if(k==="rec"){
+    const after=BigInt(cyl.contents)+amt;
+    if(after>BigInt(cyl.capacity)){
+      $("mvWhy").textContent="That would put "+lb(after)+" lb in a "+lb2(cyl.capacity)+" lb cylinder. The contract refuses it rather than clamping.";
+      $("mvWhy").className="why warn"; $("mvBtn").disabled=true; return;
+    }
+    $("mvWhy").textContent="After this the can holds "+lb(after)+" lb.";
+  } else {
+    if(amt>BigInt(cyl.contents)){
+      $("mvWhy").textContent="Only "+lb(cyl.contents)+" lb in it — you can't take out more than went in.";
+      $("mvWhy").className="why warn"; $("mvBtn").disabled=true; return;
+    }
+    $("mvWhy").textContent="After this the can holds "+lb(BigInt(cyl.contents)-amt)+" lb.";
+  }
+  if((k==="rcl"||k==="dst") && !ethers.isAddress($("mvTo").value.trim())){
+    $("mvWhy").textContent="Who received it? A disposition needs a destination address.";
+    $("mvWhy").className="why warn"; $("mvBtn").disabled=true; return;
+  }
+  $("mvWhy").className="why"; $("mvBtn").disabled=false;
+}
+
+/* ---------------- connect ---------------- */
+(async function restore(){
+  if(!window.ethereum) return;
+  try{ const a=await window.ethereum.request({method:"eth_accounts"}); if(a&&a.length) await connect(true); }catch(_){}
+})();
+$("regBtn").onclick=()=>signer?doRegister():connect(false);
+
+async function connect(silent){
+  if(!window.ethereum){
+    if(!silent){ $("regWhy").textContent="No wallet in this browser."; $("regWhy").className="why warn"; }
+    return;
+  }
+  try{
+    if(!silent) await window.ethereum.request({method:"eth_requestAccounts"});
+    const n=await window.ethereum.request({method:"eth_chainId"});
+    if(parseInt(n,16)!==CHAIN){
+      try{ await window.ethereum.request({method:"wallet_switchEthereumChain",params:[{chainId:ARC.chainId}]}); }
+      catch(e){ if(e.code===4902) await window.ethereum.request({method:"wallet_addEthereumChain",params:[ARC]}); else throw e; }
+    }
+    const bp=new ethers.BrowserProvider(window.ethereum);
+    wp=bp; signer=await bp.getSigner(); me=await signer.getAddress();
+    $("regBtn").textContent="Register it";
+    await Promise.all([load(),renderMine()]);
+  }catch(e){
+    if(!silent){ $("regWhy").textContent="Wallet didn't connect: "+(e.shortMessage||e.message); $("regWhy").className="why warn"; }
+  }
+}
+
+/* ---------------- write ---------------- */
+const ERRS={
+  CylinderExists:"A cylinder with that serial is already registered.",
+  NoSuchCylinder:"No cylinder at that number.",
+  NotHolder:"You don't hold this cylinder.",
+  NotReceiver:"That handoff wasn't offered to you.",
+  TransferPending:"A handoff is pending — nothing can be logged until it's accepted or cancelled.",
+  NoTransferPending:"There's no handoff waiting.",
+  SelfTransfer:"You already hold it.",
+  CylinderRetired:"This cylinder is retired from service.",
+  EmptySerial:"A serial is required.",
+  ZeroAmount:"Amount can't be zero.",
+  ZeroAddress:"That address isn't valid."
+};
+function why(e){
+  const m=e.shortMessage||e.message||"";
+  if(m.includes("rejected")||e?.code==="ACTION_REJECTED") return "You rejected the signature. Nothing was logged.";
+  let r=e?.revert;
+  if(!r){ const d=e?.data||e?.info?.error?.data||e?.error?.data;
+    if(typeof d==="string"){ try{ r=IFACE.parseError(d); }catch(_){} } }
+  if(r&&ERRS[r.name]) return ERRS[r.name];
+  if(r&&r.name==="OverCapacity"&&r.args) return "That would put "+lb(r.args[0])+" lb in a "+lb(r.args[1])+" lb cylinder.";
+  if(r&&r.name==="InsufficientContents"&&r.args) return "Only "+lb(r.args[1])+" lb in the can — can't take out "+lb(r.args[0])+".";
+  if(r) return "Reverted: "+r.name;
+  return "Failed: "+m;
+}
+
+async function doRegister(){
+  const b=$("regBtn"); b.disabled=true;
+  try{
+    const s=$("nSerial").value.trim();
+    if(!s) throw new Error("Serial is required");
+    const cap=toTh($("nCap").value.trim()||"0");
+    if(cap===0n) throw new Error("Capacity is required");
+    const has=toTh($("nHas").value.trim()||"0");
+    b.textContent="Registering…";
+    const c=new ethers.Contract(CT,ABI,signer);
+    const tx=await c.registerCylinder(s,$("nGas").value,cap,has,$("nNote").value.trim());
+    const rc=await tx.wait();
+    let id=0;
+    for(const lg of rc.logs){
+      try{ const p=IFACE.parseLog(lg); if(p&&p.name==="Registered"){ id=Number(p.args[0]); break; } }catch(_){}
+    }
+    $("nSerial").value=""; $("nCap").value=""; $("nHas").value=""; $("nNote").value="";
+    await renderMine();
+    if(id) openCyl(id);
+    $("regWhy").textContent="On the record."; $("regWhy").className="why ok";
+  }catch(e){ $("regWhy").textContent=why(e); $("regWhy").className="why warn"; }
+  finally{ b.disabled=false; b.textContent=signer?"Register it":"Connect wallet"; }
+}
+
+$("mvBtn").onclick=async()=>{
+  const b=$("mvBtn"); b.disabled=true; b.textContent="Confirm…";
+  try{
+    const amt=toTh($("mvAmt").value.trim());
+    const job=$("mvJob").value.trim();
+    const ref = job ? ethers.id(job) : ethers.ZeroHash;
+    const note=$("mvNote").value.trim();
+    const k=$("mvKind").value;
+    const c=new ethers.Contract(CT,ABI,signer);
+    if(k==="rec") await (await c.recordRecovery(cid,amt,ref,note)).wait();
+    else if(k==="chg") await (await c.recordCharge(cid,amt,ref,note)).wait();
+    else await (await c.recordDisposition(cid,amt,$("mvTo").value.trim(),k==="dst",ref,note)).wait();
+    $("mvAmt").value=""; $("mvJob").value=""; $("mvNote").value="";
+    await load();
+    $("mvWhy").textContent="Logged. It can't be edited or removed."; $("mvWhy").className="why ok";
+  }catch(e){ $("mvWhy").textContent=why(e); $("mvWhy").className="why warn"; }
+  finally{ b.disabled=false; b.textContent="Log it"; }
+};
+
+$("hBtn").onclick=async()=>{
+  const b=$("hBtn"); b.disabled=true; b.textContent="Confirm…";
+  try{
+    const to=$("hTo").value.trim();
+    if(!ethers.isAddress(to)) throw new Error("That address isn't valid");
+    const c=new ethers.Contract(CT,ABI,signer);
+    await (await c.proposeTransfer(cid,to)).wait();
+    $("hTo").value="";
+    await load();
+    $("hWhy").textContent="Offered. It stays yours on the record until they accept it.";
+    $("hWhy").className="why ok";
+  }catch(e){ $("hWhy").textContent=why(e); $("hWhy").className="why warn"; }
+  finally{ b.disabled=false; b.textContent="Offer the cylinder"; }
+};
+
+async function doAccept(){
+  const b=$("acceptBtn"); b.disabled=true; b.textContent="Confirm…";
+  try{
+    const c=new ethers.Contract(CT,ABI,signer);
+    await (await c.acceptTransfer(cid)).wait();
+    await Promise.all([load(),renderMine()]);
+  }catch(e){ $("rigWhy").textContent=why(e); $("rigWhy").className="why warn"; b.disabled=false; }
+}
+async function doCancel(){
+  const b=$("cancelBtn"); b.disabled=true; b.textContent="Confirm…";
+  try{
+    const c=new ethers.Contract(CT,ABI,signer);
+    await (await c.cancelTransfer(cid)).wait();
+    await load();
+  }catch(e){ $("rigWhy").textContent=why(e); $("rigWhy").className="why warn"; b.disabled=false; }
+}
+let armRetire=false;
+async function doRetire(){
+  const b=$("retireBtn");
+  if(!armRetire){
+    armRetire=true; b.textContent="Confirm — retire it?";
+    $("rigWhy").textContent="Retiring closes the cylinder to further entries. The history stays readable but nothing more can be logged. Click again to confirm.";
+    $("rigWhy").className="why warn";
+    setTimeout(()=>{ if(armRetire){ armRetire=false; if($("retireBtn")) $("retireBtn").textContent="Retire this cylinder"; } },6000);
+    return;
+  }
+  armRetire=false; b.disabled=true; b.textContent="Confirm…";
+  try{
+    const c=new ethers.Contract(CT,ABI,signer);
+    await (await c.retire(cid,"out of service")).wait();
+    await load();
+  }catch(e){ $("rigWhy").textContent=why(e); $("rigWhy").className="why warn"; b.disabled=false; }
+}
+
+load();
+</script>
+</body>
+</html>
