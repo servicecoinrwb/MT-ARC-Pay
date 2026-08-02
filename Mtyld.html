@@ -288,7 +288,7 @@
   <p class="note">
     Vault <code id="addrOut">—</code><br>
     Asset <code id="assetOut">—</code><br>
-    <a href="https://testnet.arcscan.app" target="_blank" rel="noopener">Verify onchain</a> · unaudited · testnet funds only
+    <a href="./mtyld-guide.html">What is this?</a> · <a href="https://testnet.arcscan.app" target="_blank" rel="noopener">Verify onchain</a> · unaudited · testnet funds only
   </p>
 </div>
 
@@ -480,11 +480,11 @@ async function quoteRed(){
 function quoteRev(){
   if(!isOwner) return;
   const v=$("revAmt").value.trim();
-  if(!v||isNaN(v)||Number(v)<=0){ $("revQuote").textContent="Enter an amount to see the effect on price per share."; return; }
+  if(!v||isNaN(v)||Number(v)<=0){ $("revQuote").textContent="Enter an amount to see the effect on value per share."; return; }
   try{
     const add=pA(v);
     const newPps=(nav.assets+add+1n)*(10n**SD)/(nav.supply+10n**6n);
-    $("revQuote").innerHTML="Price per share would move from <b>"+Number(ethers.formatUnits(nav.pps,AD)).toFixed(6)+
+    $("revQuote").innerHTML="Value per share would move from <b>"+Number(ethers.formatUnits(nav.pps,AD)).toFixed(6)+
       "</b> to <b>"+Number(ethers.formatUnits(newPps,AD)).toFixed(6)+" USDC</b>. No shares are minted, so nobody is diluted.";
   }catch{}
 }
@@ -589,7 +589,7 @@ $("revBtn").onclick=async()=>{
     const v=new ethers.Contract(VAULT,VAULT_ABI,signer);
     await (await v.reportRevenue(amt)).wait();
     $("revAmt").value=""; await load();
-    $("ownerWhy").textContent="Revenue reported. Price per share moved for every holder.";
+    $("ownerWhy").textContent="Revenue reported. Value per share moved for every holder.";
   }catch(e){ $("ownerWhy").textContent=explain(e); }
   finally{ b.disabled=false; b.textContent="Report revenue"; }
 };
