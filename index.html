@@ -39,7 +39,7 @@
   .lede b{color:var(--cream);font-weight:500}
 
   /* live strip */
-  .strip{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:rgba(111,183,227,.22);
+  .strip{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:rgba(111,183,227,.22);
     border:1px solid rgba(111,183,227,.22);border-radius:3px;margin:28px 0 40px;overflow:hidden}
   .cell{background:#152a46;padding:16px 14px;text-align:center}
   .cell dt{font-family:"IBM Plex Mono",monospace;font-size:10px;letter-spacing:.11em;text-transform:uppercase;color:rgba(245,239,227,.5);margin:0 0 5px}
@@ -72,6 +72,15 @@
   .draws tr:last-child td{border-bottom:0}
   .draws .n{width:26px;color:rgba(13,23,38,.4)}
   .draws .amt{text-align:right;white-space:nowrap;font-weight:600;color:var(--navy);padding-left:12px}
+  .canrow{display:flex;align-items:flex-end;gap:13px;margin:0 0 10px}
+  .mini{width:32px;flex:none}
+  .mini .sh{height:7px;background:#c8607a;border-radius:15px 15px 2px 2px}
+  .mini .bd{position:relative;height:42px;background:linear-gradient(90deg,#8f9096,#b4b6bd 35%,#83858b);
+    border-radius:2px 2px 5px 5px;overflow:hidden}
+  .mini .fl{position:absolute;left:0;right:0;bottom:0;height:62%;background:#c8607a;opacity:.85}
+  .canrow span{font-family:"IBM Plex Mono",monospace;font-size:11px;color:rgba(13,23,38,.6);line-height:1.7}
+  .canrow b{color:var(--navy);font-weight:600}
+
   .addr{font-family:"IBM Plex Mono",monospace;font-size:10.5px;color:rgba(13,23,38,.45);
     border-top:1px dashed var(--rule);padding:11px 24px;margin:0;word-break:break-all}
   .addr a{color:#1c5f88}
@@ -116,13 +125,14 @@
   <header class="hero">
     <p class="eyebrow">Southfield, Michigan · Licensed HVAC & mechanical · Lic. #7117025</p>
     <h1>A contractor's cash flow, <em>rebuilt onchain</em>.</h1>
-    <p class="lede">Three working systems on <b>Arc</b>, Circle's stablecoin chain: invoices that settle in under a second, escrow that releases draws on a clock instead of a phone call, and a vault backed by real HVAC revenue. Built and operated by the contractor, not bought from a vendor.</p>
+    <p class="lede">Four working systems on <b>Arc</b>, Circle's stablecoin chain: invoices that settle in under a second, escrow that releases draws on a clock instead of a phone call, a vault backed by real HVAC revenue, and a refrigerant custody log. Built and operated by the contractor, not bought from a vendor.</p>
   </header>
 
   <dl class="strip">
     <div class="cell"><dt>Invoices issued</dt><dd id="invCount">—</dd></div>
     <div class="cell"><dt>Escrow jobs</dt><dd id="jobCount">—</dd></div>
     <div class="cell"><dt>MTYLD / share</dt><dd id="ppsOut">—</dd></div>
+    <div class="cell"><dt>Cylinders logged</dt><dd id="cylOut">—</dd></div>
   </dl>
   <p class="strip-note" id="stripNote">Reading live from Arc…</p>
 
@@ -187,6 +197,29 @@
     <p class="addr">0x5a89a64D7FCfE0128d068a372c04F8B8204bDb60 · <a href="https://testnet.arcscan.app/address/0x5a89a64D7FCfE0128d068a372c04F8B8204bDb60" target="_blank" rel="noopener">verified source</a></p>
   </article>
 
+  <!-- 04 -->
+  <article class="tool">
+    <div class="tool-body">
+      <div class="tool-num">04</div>
+      <h2>Refrigerant chain of custody</h2>
+      <p class="sub">Custody · custody.html</p>
+      <p>Every pound recovered has to be accounted for — what came out of which appliance, on what date, and who it went to for reclamation. Records kept three years, penalties into six figures a day. Today that's a paper tag on a cylinder and a line in a logbook, and when your numbers disagree with the reclaimer's there's no third thing to check.</p>
+      <p class="live">Here every handoff needs both ends to sign: the holder offers, the receiver accepts from their own wallet. Job addresses stay in DSM — only a fingerprint of the record goes on chain.</p>
+
+      <div class="use">
+        <h4>When you'd use it</h4>
+        <div class="canrow">
+          <div class="mini"><div class="sh"></div><div class="bd"><div class="fl"></div></div></div>
+          <span><b>18.60 lb</b> in a 30 lb R-410A recovery cylinder<br>recovered 30.45 · charged 2.50 · sent out 20.00 — <b>reconciles</b></span>
+        </div>
+        <p>A tech logs a recovery from the truck. The cylinder goes to the reclaimer, who accepts it on their own wallet — so the transfer exists once, agreed by both, rather than twice in two different logbooks.</p>
+        <p><b>What it isn't:</b> a compliance system. It can't verify anyone's certification or check that entered pounds match recovered pounds, and satisfies no requirement on its own. It corroborates the records you're already required to keep.</p>
+      </div>
+      <a class="go" href="./custody.html" style="margin-top:16px">Open the custody log →</a>
+    </div>
+    <p class="addr">0xD586320120C691B5BE7606fa187C063A5a8cD6D6 · <a href="https://testnet.arcscan.app/address/0xD586320120C691B5BE7606fa187C063A5a8cD6D6" target="_blank" rel="noopener">verified source</a></p>
+  </article>
+
   <section class="sect">
     <h3>Why Arc</h3>
     <ul class="facts">
@@ -224,6 +257,7 @@ const RPCS=["https://rpc.blockdaemon.testnet.arc.network","https://arc-testnet.d
 const INV="0xd435e6D506424AdA0A3BBc06e6d3E3Bf5E2C157D";
 const ESC="0xb1F6c301853806C82E77f2B1B73b23264097bB98";
 const VAULT="0x5a89a64D7FCfE0128d068a372c04F8B8204bDb60";
+const CYL="0xD586320120C691B5BE7606fa187C063A5a8cD6D6";
 
 const pool=RPCS.map(u=>new ethers.JsonRpcProvider(u));
 async function call(addr,abi,fn){
@@ -264,7 +298,13 @@ const usd=v=>Number(ethers.formatUnits(v,6)).toLocaleString("en-US",{minimumFrac
     ok++;
   }catch(e){ $("liveVault").textContent="Couldn't reach the vault just now — the public RPCs rate-limit under load. The page below still works."; }
 
-  $("stripNote").textContent = ok===3
+  try{
+    const n=await call(CYL,["function nextId() view returns (uint256)"],c=>c.nextId());
+    $("cylOut").textContent=(n>0n?n-1n:0n).toString();
+    ok++;
+  }catch(e){}
+
+  $("stripNote").textContent = ok>=3
     ? "Read live from Arc just now — not cached, not typed in by hand."
     : ok===0 ? "Chain reads are failing right now; the public RPCs throttle under load. Try a reload."
     : "Partial read — some public RPCs are throttling. Reload for the rest.";
