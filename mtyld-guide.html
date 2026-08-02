@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>What MTYLD is</title>
+<meta name="description" content="A USDC vault whose share value rises when a licensed HVAC contractor reports revenue into it.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=Archivo+Black&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --navy:#16263f; --sky:#6fb7e3; --cream:#f5efe3; --rust:#b5512f;
+    --ink:#0d1726; --ok:#4fbf8b; --line:rgba(245,239,227,.13);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    background:var(--navy);
+    background-image:
+      repeating-linear-gradient(90deg,rgba(255,255,255,.014) 0 2px,transparent 2px 5px),
+      radial-gradient(900px 480px at 50% -8%,rgba(111,183,227,.15),transparent 62%);
+    color:var(--cream);font-family:"IBM Plex Sans",system-ui,sans-serif;
+    font-size:15.5px;line-height:1.68;padding:26px 15px 80px;display:flex;justify-content:center}
+  .shell{width:100%;max-width:660px}
+
+  .topbar{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:34px;flex-wrap:wrap}
+  .wordmark{line-height:1}
+  .wordmark img{display:block;height:24px;width:auto;max-width:min(60vw,220px)}
+  .back{font-family:"IBM Plex Mono",monospace;font-size:10px;letter-spacing:.12em;text-transform:uppercase;
+    color:var(--sky);text-decoration:none;border:1px solid rgba(111,183,227,.4);padding:6px 13px}
+  .back:hover{background:rgba(111,183,227,.09)}
+
+  h1{font-family:"Archivo Black",sans-serif;font-size:clamp(29px,6.8vw,42px);line-height:1.1;
+    letter-spacing:-.02em;margin:0 0 16px}
+  h1 em{font-style:normal;color:var(--sky)}
+  .lede{font-size:17px;color:rgba(245,239,227,.7);margin:0 0 10px;max-width:56ch}
+
+  h2{font-family:"Archivo",sans-serif;font-weight:700;font-size:15px;letter-spacing:.09em;
+    text-transform:uppercase;color:var(--sky);margin:46px 0 12px}
+  h3{font-family:"Archivo",sans-serif;font-weight:600;font-size:18px;margin:0 0 6px;color:var(--cream)}
+  p{color:rgba(245,239,227,.7);margin:0 0 14px;max-width:62ch}
+  b{color:var(--cream);font-weight:500}
+
+  /* the one diagram worth drawing: what moves the number */
+  .movers{background:rgba(245,239,227,.04);border:1px solid var(--line);padding:20px;margin:22px 0 10px}
+  .movers-lab{font-family:"IBM Plex Mono",monospace;font-size:9.5px;letter-spacing:.15em;
+    text-transform:uppercase;color:rgba(245,239,227,.4);margin:0 0 14px}
+  .mv{display:flex;align-items:center;gap:14px;padding:11px 0;border-bottom:1px solid var(--line)}
+  .mv:last-child{border-bottom:0}
+  .mv .act{font-family:"IBM Plex Mono",monospace;font-size:12.5px;color:var(--cream);flex:1;min-width:0}
+  .mv .eff{font-family:"IBM Plex Mono",monospace;font-size:11.5px;white-space:nowrap;letter-spacing:.04em}
+  .eff.up{color:var(--ok)} .eff.flat{color:rgba(245,239,227,.4)}
+  .movers p{font-size:13.5px;color:rgba(245,239,227,.55);margin:16px 0 0}
+
+  .case{background:rgba(245,239,227,.04);border:1px solid var(--line);padding:19px;margin:0 0 12px}
+  .case p{font-size:14.5px;color:rgba(245,239,227,.66);margin:0 0 10px}
+  .case p:last-child{margin:0}
+
+  table{width:100%;border-collapse:collapse;margin:10px 0 18px;font-size:14.5px}
+  th,td{text-align:left;padding:11px 0;border-bottom:1px solid var(--line);
+    color:rgba(245,239,227,.7);vertical-align:top}
+  th{font-family:"IBM Plex Mono",monospace;font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;
+    color:rgba(245,239,227,.38);font-weight:400}
+  td:first-child{color:var(--cream);width:38%;padding-right:16px}
+
+  .plain{border-left:2px solid var(--rust);padding:2px 0 2px 16px;margin:20px 0}
+  .plain p{font-size:15px;color:rgba(245,239,227,.62)}
+  .plain p:last-child{margin:0}
+
+  .cta{display:inline-block;background:var(--sky);color:#0a1a2a;font-weight:600;font-size:15px;
+    text-decoration:none;padding:13px 22px;margin-top:10px}
+  .cta:hover{filter:brightness(1.08)}
+
+  footer{margin-top:52px;padding-top:20px;border-top:1px solid var(--line);
+    font-family:"IBM Plex Mono",monospace;font-size:10.5px;line-height:1.8;color:rgba(245,239,227,.3)}
+  footer a{color:var(--sky)}
+  a{color:var(--sky)}
+  @media (max-width:520px){ table,tbody,tr,td,th{display:block} th{display:none}
+    tr{border-bottom:1px solid var(--line);padding:10px 0} td{border:0;padding:2px 0;width:auto}
+    td:first-child{color:var(--cream);font-weight:500}
+    .mv{flex-direction:column;align-items:flex-start;gap:4px} }
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <div class="topbar">
+    <div class="wordmark">
+      <img src="https://cdn.mechanicaltemp.com/logos/white/text/white_textlogo_transparent_background.png"
+           alt="Mechanical Temp" onerror="this.replaceWith(document.createTextNode(this.alt))">
+    </div>
+    <a class="back" href="./mtyld.html">Open the vault</a>
+  </div>
+
+  <h1>A token backed by <em>rooftop units</em>.</h1>
+  <p class="lede">Nearly every token is backed by the expectation that somebody will pay more for it later. This one is backed by service calls, changeouts and maintenance contracts — a licensed mechanical shop in Southfield that was billing customers for twenty years before it wrote a line of Solidity.</p>
+
+  <h2>What moves the number</h2>
+  <p>MTYLD is an ERC-4626 vault holding USDC. Its share value is simply the assets in it divided by the shares outstanding, and exactly one thing moves that ratio.</p>
+
+  <div class="movers">
+    <p class="movers-lab">Effect on value per share</p>
+    <div class="mv"><span class="act">Someone deposits USDC</span><span class="eff flat">no change</span></div>
+    <div class="mv"><span class="act">Someone redeems their shares</span><span class="eff flat">no change</span></div>
+    <div class="mv"><span class="act">A hundred people pile in at once</span><span class="eff flat">no change</span></div>
+    <div class="mv"><span class="act">Mechanical Temp reports revenue</span><span class="eff up">↑ rises for everyone</span></div>
+    <p>Deposits and redemptions move assets and shares together, so the ratio holds. Reporting revenue adds assets and mints <b>no</b> new shares — which is why it lifts the value for every holder at once and can't dilute anyone.</p>
+  </div>
+
+  <h2>Two things it is not</h2>
+
+  <div class="case">
+    <h3>It isn't a working-capital facility</h3>
+    <p>Deposits stay in the vault. The contract has no function that moves them to the business, to the operator, or anywhere else — you can read it yourself. Money in the vault is not money the shop is spending on equipment.</p>
+  </div>
+
+  <div class="case">
+    <h3>It isn't a yield product</h3>
+    <p>There's no rate, no APY, and nothing accrues on a schedule. If the shop has a slow month, the number sits exactly where it is. Nothing is emitted, nothing is farmed, and no treasury prints tokens to make a percentage look good.</p>
+  </div>
+
+  <h2>The locked shares, and why they exist</h2>
+  <p>Share value is assets ÷ shares. If the share count is ever allowed to approach zero while assets remain — one full withdrawal leaving dust behind — that division produces nonsense. <b>This already happened once</b>, on a sibling vault, where the price ran to over a million dollars a share and the funds had to be pulled out.</p>
+  <p>So this vault ships with three guards. Virtual shares put a floor under the divisor mathematically. A dead-share position was minted at launch to a burn address, unredeemable by anyone including the operator, so real supply never returns to zero. And a withdrawal floor is asserted on every redemption in case someone refactors the first two away.</p>
+  <p>The gauge on the vault page shows what portion of supply is that locked position. It's large now because the vault is small; it shrinks toward nothing as deposits grow.</p>
+
+  <h2>Where the fee goes</h2>
+  <table>
+    <tr><th>Event</th><th>Cost</th></tr>
+    <tr><td>Depositing</td><td>Nothing. No entry fee — you're not taxed for showing up.</td></tr>
+    <tr><td>Holding</td><td>Nothing. No management fee, no drag on the share value.</td></tr>
+    <tr><td>Redeeming</td><td>1% of what you withdraw, paid to Mechanical Temp.</td></tr>
+  </table>
+  <p>That 1% is the shop's cut, and it's capped at 3% by a constant compiled into the contract — a ceiling nobody can raise, including the operator. Fees leave the vault immediately rather than sitting inside it pretending to be depositor assets, which would corrupt the share value.</p>
+
+  <h2>What could go wrong</h2>
+  <div class="plain">
+    <p><b>Revenue reporting is voluntary.</b> The contract cannot compel Mechanical Temp to report anything. If the shop stops, the number stops. That is a trust relationship with a business, not a guarantee enforced by code, and no amount of Solidity changes it.</p>
+    <p><b>The exit fee means short round trips lose money.</b> Deposit and redeem the same day and you're down 1% for nothing. This only makes sense held across reporting periods.</p>
+    <p><b>The operator can pause deposits and redemptions.</b> Existing positions aren't touched by a pause, but you can't exit during one.</p>
+    <p><b>Reporting into a nearly-empty vault mostly benefits the locked shares.</b> Early on, a large share of any reported revenue lands on a position nobody can redeem. It's an argument for reporting after deposits arrive, not before.</p>
+    <p><b>Unaudited, on a testnet.</b> The NAV math is verified against a reproducible simulation covering full exits, donation attacks and redeposits with zero value leak. That's not a professional review, and every dollar here is play money.</p>
+  </div>
+
+  <h2>See it</h2>
+  <p>The vault page reads live: value per share, assets held, how much of the supply is locked, and what your position is worth net of the exit fee. Test USDC comes from <a href="https://faucet.circle.com" target="_blank" rel="noopener">Circle's faucet</a>.</p>
+  <a class="cta" href="./mtyld.html">Open the vault →</a>
+
+  <footer>
+    MTYLD · Arc Testnet, chain 5042002<br>
+    Vault <a href="https://testnet.arcscan.app/address/0x5a89a64D7FCfE0128d068a372c04F8B8204bDb60" target="_blank" rel="noopener">0x5a89…Db60</a>, source verified onchain.<br>
+    Mechanical Temp LLC · 23093 Telegraph Rd, Southfield MI · Lic. #7117025
+  </footer>
+</div>
+</body>
+</html>
