@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MTYLD · Mechanical Temp Yield</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=Archivo+Black&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/ethers@6.13.4/dist/ethers.umd.min.js"></script>
+<style>
+  /* ============================================================
+     The reference object is an equipment nameplate — the stamped
+     metal data plate riveted to every rooftop unit. Model, charge,
+     ratings. A vault's NAV per share IS a rating, and its specs
+     read the same way, so the page is built as a plate.
+     MT brand colours, grounded in steel.
+     ============================================================ */
+  :root{
+    --navy:#16263f;
+    --sky:#6fb7e3;
+    --cream:#f5efe3;
+    --rust:#b5512f;
+    --ink:#0d1726;
+    --steel-1:#d8d4cc;
+    --steel-2:#c3bfb6;
+    --steel-3:#b0aba1;
+    --engrave:rgba(13,23,38,.55);
+    --ok:#2f6b45;
+    --line:rgba(13,23,38,.22);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    background:var(--navy);
+    background-image:
+      repeating-linear-gradient(90deg,rgba(255,255,255,.014) 0 2px,transparent 2px 5px),
+      radial-gradient(900px 500px at 50% -8%,rgba(111,183,227,.16),transparent 62%);
+    color:var(--cream);
+    font-family:"IBM Plex Sans",system-ui,sans-serif;
+    font-size:15.5px;line-height:1.6;
+    padding:26px 15px 72px;display:flex;justify-content:center;
+  }
+  .shell{width:100%;max-width:680px}
+
+  .topbar{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:16px;flex-wrap:wrap}
+  .wordmark{font-family:"Archivo Black",sans-serif;font-size:17px;letter-spacing:.14em;
+    text-transform:uppercase;color:var(--cream)}
+  .wordmark span{color:var(--sky)}
+  .netbadge{font-family:"IBM Plex Mono",monospace;font-size:10px;letter-spacing:.1em;
+    text-transform:uppercase;color:var(--sky);border:1px solid rgba(111,183,227,.4);padding:4px 9px}
+  .netbadge.live{color:var(--cream);border-color:rgba(181,81,47,.75);background:rgba(181,81,47,.3)}
+
+  /* ---------- SIGNATURE: the nameplate ---------- */
+  .plate{
+    position:relative;
+    background:
+      repeating-linear-gradient(90deg,rgba(255,255,255,.055) 0 1px,transparent 1px 3px),
+      linear-gradient(160deg,var(--steel-1) 0%,var(--steel-2) 45%,var(--steel-3) 100%);
+    color:var(--ink);
+    border:2px solid #8e8981;
+    border-radius:5px;
+    padding:22px 24px 18px;
+    box-shadow:0 22px 46px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.5);
+  }
+  /* rivets */
+  .plate::before,.plate::after{content:"";position:absolute;width:9px;height:9px;border-radius:50%;
+    background:radial-gradient(circle at 35% 30%,#f2eee7,#8d887f);
+    box-shadow:inset 0 0 0 1px rgba(0,0,0,.25);top:10px}
+  .plate::before{left:11px} .plate::after{right:11px}
+  .plate .rivets-b{position:absolute;left:0;right:0;bottom:10px;height:9px;pointer-events:none}
+  .plate .rivets-b i{position:absolute;width:9px;height:9px;border-radius:50%;
+    background:radial-gradient(circle at 35% 30%,#f2eee7,#8d887f);
+    box-shadow:inset 0 0 0 1px rgba(0,0,0,.25)}
+  .plate .rivets-b i:first-child{left:11px} .plate .rivets-b i:last-child{right:11px}
+
+  .plate-head{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;
+    flex-wrap:wrap;padding:0 6px 12px;border-bottom:2px solid var(--navy);margin-bottom:16px}
+  .maker{font-family:"Archivo Black",sans-serif;font-size:13px;letter-spacing:.13em;
+    text-transform:uppercase;color:var(--navy);margin:0}
+  .maker small{display:block;font-family:"IBM Plex Mono",monospace;font-weight:400;font-size:9.5px;
+    letter-spacing:.1em;color:var(--engrave);margin-top:4px;text-transform:none}
+  .plate-right{text-align:right;font-family:"IBM Plex Mono",monospace;font-size:10px;
+    letter-spacing:.08em;color:var(--engrave);line-height:1.7;text-transform:uppercase}
+
+  /* the stamped rating */
+  .rating{padding:2px 6px 6px}
+  .rating-lab{font-family:"IBM Plex Mono",monospace;font-size:9.5px;letter-spacing:.2em;
+    text-transform:uppercase;color:var(--engrave);margin:0 0 4px}
+  .pps{font-family:"Archivo Black",sans-serif;
+    font-size:clamp(38px,10.5vw,62px);line-height:1;letter-spacing:-.02em;color:var(--navy);
+    margin:0;font-variant-numeric:tabular-nums;
+    text-shadow:0 1px 0 rgba(255,255,255,.55), 0 -1px 0 rgba(0,0,0,.18)}
+  .pps small{font-family:"IBM Plex Mono",monospace;font-weight:500;font-size:13px;
+    letter-spacing:.1em;margin-left:9px;color:var(--engrave)}
+  .delta{font-family:"IBM Plex Sans",sans-serif;font-size:13px;color:rgba(13,23,38,.72);
+    margin:9px 0 0;max-width:56ch}
+  .delta b{color:var(--ok);font-weight:600}
+
+  /* spec grid — the nameplate rows */
+  .specs{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);
+    margin:18px 6px 0;border:1px solid var(--line)}
+  .specs > div{background:rgba(255,255,255,.24);padding:11px 10px;text-align:center}
+  .specs dt{font-family:"IBM Plex Mono",monospace;font-size:8.5px;letter-spacing:.15em;
+    text-transform:uppercase;color:var(--engrave);margin:0 0 4px}
+  .specs dd{margin:0;font-family:"IBM Plex Mono",monospace;font-size:15px;font-weight:600;color:var(--navy)}
+
+  /* supply gauge */
+  .gauge{margin:16px 6px 0}
+  .gauge-lab{display:flex;justify-content:space-between;font-family:"IBM Plex Mono",monospace;
+    font-size:8.5px;letter-spacing:.15em;text-transform:uppercase;color:var(--engrave);margin-bottom:6px}
+  .bar{height:14px;display:flex;border:1px solid var(--navy);background:rgba(255,255,255,.3)}
+  .bar-lock{background:var(--navy)}
+  .bar-circ{background:var(--sky)}
+  .gauge-key{display:flex;gap:15px;flex-wrap:wrap;margin-top:7px;
+    font-family:"IBM Plex Mono",monospace;font-size:10px;color:rgba(13,23,38,.65)}
+  .kd{display:inline-block;width:8px;height:8px;margin-right:5px;vertical-align:0;border:1px solid var(--navy)}
+  .k1{background:var(--navy)} .k2{background:var(--sky)}
+
+  .holder{margin:16px 6px 0;padding-top:13px;border-top:1px dashed var(--line)}
+  .hrow{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:5px 0;
+    font-family:"IBM Plex Mono",monospace;font-size:12px}
+  .hrow dt{color:var(--engrave);letter-spacing:.08em;text-transform:uppercase;font-size:9.5px;margin:0}
+  .hrow dd{margin:0;color:var(--navy);font-weight:600;text-align:right}
+
+  .navwhy{margin:16px 6px 4px;padding-top:12px;border-top:1px dashed var(--line);
+    font-family:"IBM Plex Mono",monospace;font-size:9.5px;line-height:1.7;color:rgba(13,23,38,.55)}
+
+  .chip{display:inline-block;font-family:"IBM Plex Mono",monospace;font-size:9px;letter-spacing:.12em;
+    text-transform:uppercase;padding:3px 8px;border:1px solid currentColor}
+  .chip.open{color:var(--ok)}
+  .chip.shut{color:var(--rust)}
+
+  /* ---------- panels ---------- */
+  .panel{background:rgba(245,239,227,.045);border:1px solid rgba(245,239,227,.14);
+    padding:19px;margin-top:13px}
+  .panel h2{font-family:"Archivo",sans-serif;font-weight:700;font-size:15px;letter-spacing:.06em;
+    text-transform:uppercase;margin:0 0 4px;color:var(--cream);display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+  .how{font-size:13px;color:rgba(245,239,227,.6);margin:0 0 14px;border-left:2px solid var(--sky);padding-left:10px}
+  button{font-family:"Archivo",sans-serif;font-size:14px;font-weight:600;letter-spacing:.02em;
+    border:0;padding:12px 18px;cursor:pointer;width:100%;background:var(--sky);color:#0a1a2a;transition:filter .14s}
+  button:hover:not(:disabled){filter:brightness(1.08)}
+  button:focus-visible{outline:2px solid var(--cream);outline-offset:2px}
+  button:disabled{background:rgba(245,239,227,.1);color:rgba(245,239,227,.32);cursor:not-allowed}
+  button.ghost{background:transparent;color:var(--cream);box-shadow:inset 0 0 0 1px rgba(245,239,227,.25)}
+  button.ghost:hover:not(:disabled){background:rgba(245,239,227,.06)}
+  .why{font-family:"IBM Plex Mono",monospace;font-size:11px;line-height:1.6;color:rgba(245,239,227,.5);margin:9px 0 0}
+  .why.warn{color:#e08a6a}
+  input{width:100%;font-family:"IBM Plex Mono",monospace;font-size:14.5px;padding:11px 12px;
+    border:1px solid rgba(245,239,227,.18);background:rgba(0,0,0,.24);color:var(--cream);margin-bottom:9px}
+  input:focus-visible{outline:2px solid var(--sky);outline-offset:1px;border-color:transparent}
+  input::placeholder{color:rgba(245,239,227,.28)}
+  .field-label{font-family:"IBM Plex Mono",monospace;font-size:9px;letter-spacing:.14em;
+    text-transform:uppercase;color:rgba(245,239,227,.45);display:flex;justify-content:space-between;margin-bottom:5px}
+  .field-label a{cursor:pointer;color:var(--sky);text-decoration:underline}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .quote{font-family:"IBM Plex Mono",monospace;font-size:11.5px;background:rgba(111,183,227,.1);
+    border-left:2px solid rgba(111,183,227,.5);padding:10px 12px;margin:0 0 10px;color:rgba(245,239,227,.78)}
+  .quote b{color:var(--cream)}
+  .role{font-family:"IBM Plex Mono",monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;
+    padding:3px 7px;border:1px solid rgba(245,239,227,.3);color:rgba(245,239,227,.75)}
+  .note{font-family:"IBM Plex Mono",monospace;font-size:10px;line-height:1.75;
+    color:rgba(245,239,227,.32);margin-top:20px;text-align:center}
+  .note code{color:var(--sky)}
+  a{color:var(--sky)}
+  .hidden{display:none !important}
+  @media (prefers-reduced-motion:reduce){*{transition:none !important}}
+  @media (max-width:560px){
+    .specs{grid-template-columns:1fr}
+    .two{grid-template-columns:1fr}
+    .plate-right{text-align:left}
+  }
+
+  /* Logo replaces the typeset wordmark. The alt text keeps the brand legible
+     if the CDN is unreachable, so the header never renders empty. */
+  .wordmark img{display:block;height:26px;width:auto;max-width:min(62vw,240px)}
+  .wordmark{line-height:1}
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <div class="topbar">
+    <div class="wordmark"><img src="https://cdn.mechanicaltemp.com/logos/white/text/white_textlogo_transparent_background.png" alt="Mechanical Temp Yield" onerror="this.replaceWith(document.createTextNode(this.alt))"></div>
+    <div class="netbadge" id="netBadge">Arc Testnet</div>
+  </div>
+
+  <!-- SIGNATURE: the nameplate -->
+  <section class="plate">
+    <div class="plate-head">
+      <p class="maker">Mechanical Temp LLC
+        <small>23093 Telegraph Rd · Southfield MI · Lic. #7117025</small>
+      </p>
+      <div class="plate-right">
+        Vault MTYLD-01<br>
+        Denominated USDC<br>
+        <span id="statusChip"></span>
+      </div>
+    </div>
+
+    <div class="rating">
+      <p class="rating-lab">Net asset value per share</p>
+      <p class="pps" id="ppsOut">—<small>USDC</small></p>
+      <p class="delta" id="deltaOut">Reading vault state…</p>
+    </div>
+
+    <dl class="specs">
+      <div><dt>Vault assets</dt><dd id="taOut">—</dd></div>
+      <div><dt>Capacity left</dt><dd id="capOut">—</dd></div>
+      <div><dt>Exit fee</dt><dd id="feeOut">—</dd></div>
+    </dl>
+
+    <div class="gauge">
+      <div class="gauge-lab"><span>Share supply</span><span>Locked / redeemable</span></div>
+      <div class="bar">
+        <div class="bar-lock" id="barLock" style="width:0%"></div>
+        <div class="bar-circ" id="barCirc" style="width:0%"></div>
+      </div>
+      <div class="gauge-key">
+        <span><i class="kd k1"></i><span id="lockPct">—</span> locked forever</span>
+        <span><i class="kd k2"></i><span id="circPct">—</span> redeemable</span>
+      </div>
+    </div>
+
+    <dl class="holder">
+      <div class="hrow"><dt>Your shares</dt><dd id="myShares">—</dd></div>
+      <div class="hrow"><dt>Your value</dt><dd id="myValue">—</dd></div>
+      <div class="hrow"><dt>Wallet USDC</dt><dd id="myUsdc">—</dd></div>
+    </dl>
+
+    <p class="navwhy" id="navWhy">Value per share is assets divided by shares. A permanently locked position was minted at launch and can never be redeemed by anyone, so the divisor can't collapse toward zero and send this rating to nonsense. The gauge above shows how much of the supply that is.</p>
+    <div class="rivets-b"><i></i><i></i></div>
+  </section>
+
+  <section class="panel">
+    <h2>Your position <span id="roleChip"></span></h2>
+    <p class="how" id="roleHow">Connect a wallet to deposit or redeem. MTYLD is a claim on Mechanical Temp's HVAC revenue, denominated in USDC.</p>
+    <button id="connectBtn">Connect wallet</button>
+    <p class="why" id="mainWhy"></p>
+  </section>
+
+  <section class="panel hidden" id="depositPanel">
+    <h2>Deposit USDC</h2>
+    <p class="how" id="depHow">You receive MTYLD shares at the current value. They're worth more when revenue is reported into the vault.</p>
+    <label class="field-label" for="depAmt"><span>Amount (USDC)</span><a id="depMax">use max</a></label>
+    <input id="depAmt" placeholder="100.00" inputmode="decimal" autocomplete="off">
+    <p class="quote" id="depQuote">Enter an amount to see what you'd receive.</p>
+    <button id="depBtn" disabled>Deposit</button>
+    <p class="why" id="depWhy"></p>
+  </section>
+
+  <section class="panel hidden" id="redeemPanel">
+    <h2>Redeem shares</h2>
+    <p class="how" id="redHow">Burns MTYLD and returns USDC at the current value, less the exit fee.</p>
+    <label class="field-label" for="redAmt"><span>Shares to redeem</span><a id="redMax">use max</a></label>
+    <input id="redAmt" placeholder="0.00" inputmode="decimal" autocomplete="off">
+    <p class="quote" id="redQuote">Enter an amount to see what you'd receive.</p>
+    <button id="redBtn" class="ghost" disabled>Redeem</button>
+    <p class="why" id="redWhy"></p>
+  </section>
+
+  <section class="panel hidden" id="ownerPanel">
+    <h2>Operator <span class="role">Mechanical Temp</span></h2>
+    <p class="how">Visible because you're the vault owner. Reporting revenue lifts the value for every holder — it mints no shares, so it can't dilute anyone.</p>
+
+    <label class="field-label" for="revAmt"><span>Report revenue (USDC)</span></label>
+    <input id="revAmt" placeholder="250.00" inputmode="decimal" autocomplete="off">
+    <p class="quote" id="revQuote">Enter an amount to see the effect on value per share.</p>
+    <button id="revBtn">Report revenue</button>
+
+    <div class="two" style="margin-top:15px">
+      <div>
+        <label class="field-label" for="feeIn"><span>Entry fee bps</span></label>
+        <input id="feeIn" placeholder="0" inputmode="numeric">
+      </div>
+      <div>
+        <label class="field-label" for="feeOutIn"><span>Exit fee bps</span></label>
+        <input id="feeOutIn" placeholder="100" inputmode="numeric">
+      </div>
+    </div>
+    <div class="two">
+      <button id="feeBtn" class="ghost">Set fees</button>
+      <button id="pauseBtn" class="ghost">Pause deposits</button>
+    </div>
+    <p class="why" id="ownerWhy">Fees are capped at 300 bps (3%) in the contract itself — that ceiling can't be raised by anyone, including you.</p>
+  </section>
+
+  <p class="note">
+    Vault <code id="addrOut">—</code><br>
+    Asset <code id="assetOut">—</code><br>
+    <a href="./mtyld-guide.html">What is this?</a> · <a href="https://testnet.arcscan.app" target="_blank" rel="noopener">Verify onchain</a> · unaudited · testnet funds only
+  </p>
+</div>
+
+<script>
+/* ============================================================
+   NETWORKS — flip ACTIVE to go live; ?net=testnet forces testnet
+   ============================================================ */
+const NETWORKS = {
+  testnet:{
+    label:"Arc Testnet", chainId:5042002,
+    rpcs:["https://rpc.blockdaemon.testnet.arc.network","https://arc-testnet.drpc.org","https://rpc.quicknode.testnet.arc.network","https://5042002.rpc.thirdweb.com","https://rpc.testnet.arc.network","https://rpc.testnet.arc.io"],
+    explorer:"https://testnet.arcscan.app",
+    vault:"0x5a89a64D7FCfE0128d068a372c04F8B8204bDb60",
+    usdc:"0x3600000000000000000000000000000000000000",
+    live:false
+  },
+  mainnet:{ label:"Arc", chainId:0, rpcs:[], explorer:"", vault:"", usdc:"", live:true }
+};
+const ACTIVE="testnet";
+const NET = NETWORKS[new URLSearchParams(location.search).get("net")] || NETWORKS[ACTIVE];
+const VAULT=NET.vault, USDC=NET.usdc, RPCS=NET.rpcs||[], CHAIN_ID=NET.chainId, EXPLORER=NET.explorer;
+
+const AD = 6n;   // asset decimals (USDC)
+const SD = 12n;  // share decimals (asset + offset)
+
+const VAULT_ABI=[
+  "function navSnapshot() view returns (uint256 assets,uint256 supply,uint256 pps,uint256 locked,uint256 cap,uint16 entryBps,uint16 exitBps,bool isSeeded,bool isPaused)",
+  "function balanceOf(address) view returns (uint256)",
+  "function previewDeposit(uint256) view returns (uint256)",
+  "function previewRedeem(uint256) view returns (uint256)",
+  "function maxDeposit(address) view returns (uint256)",
+  "function minDeposit() view returns (uint256)",
+  "function owner() view returns (address)",
+  "function deposit(uint256,address) returns (uint256)",
+  "function redeem(uint256,address,address) returns (uint256)",
+  "function reportRevenue(uint256)",
+  "function setFees(uint16,uint16)",
+  "function pause()","function unpause()"
+];
+const USDC_ABI=[
+  "function approve(address,uint256) returns (bool)",
+  "function allowance(address,address) view returns (uint256)",
+  "function balanceOf(address) view returns (uint256)"
+];
+const ARC_PARAMS={chainId:"0x"+CHAIN_ID.toString(16),chainName:NET.label,
+  nativeCurrency:{name:"USDC",symbol:"USDC",decimals:18},rpcUrls:RPCS,blockExplorerUrls:[EXPLORER]};
+
+const $=id=>document.getElementById(id);
+const fA=v=>Number(ethers.formatUnits(v,AD)).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
+const fS=v=>Number(ethers.formatUnits(v,SD)).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
+const pA=s=>ethers.parseUnits(s,AD);
+const pS=s=>ethers.parseUnits(s,SD);
+
+const pool=RPCS.map(u=>new ethers.JsonRpcProvider(u));
+let walletProvider=null;
+function readers(){ return walletProvider?[walletProvider,...pool]:pool; }
+async function readV(fn){ let e; for(const p of readers()){ try{ return await fn(new ethers.Contract(VAULT,VAULT_ABI,p)); }catch(x){e=x;} } throw e; }
+async function readU(fn){ let e; for(const p of readers()){ try{ return await fn(new ethers.Contract(USDC,USDC_ABI,p)); }catch(x){e=x;} } throw e; }
+
+let signer=null, me=null, nav=null, ownerAddr=null, isOwner=false, myShares=0n, myUsdc=0n, allowance=0n, minDep=0n;
+
+$("addrOut").textContent=VAULT||"not deployed";
+$("assetOut").textContent=USDC||"—";
+$("netBadge").textContent=NET.label;
+if(NET.live) $("netBadge").classList.add("live");
+
+if(!VAULT||!RPCS.length){
+  $("mainWhy").textContent=NET.label+" isn't configured yet. Fill in its entry in the NETWORKS block, or append ?net=testnet.";
+  $("mainWhy").className="why warn"; $("connectBtn").disabled=true;
+  throw new Error("not configured");
+}
+
+/* ---------------- read ---------------- */
+async function load(){
+  try{
+    const n=await readV(c=>c.navSnapshot());
+    nav={assets:n[0],supply:n[1],pps:n[2],locked:n[3],cap:n[4],
+         entry:Number(n[5]),exit:Number(n[6]),seeded:n[7],paused:n[8]};
+    minDep=await readV(c=>c.minDeposit());
+    if(me){
+      myShares=await readV(c=>c.balanceOf(me));
+      myUsdc=await readU(c=>c.balanceOf(me));
+      allowance=await readU(c=>c.allowance(me,VAULT));
+    }
+    render();
+  }catch(e){
+    console.error(e);
+    $("deltaOut").textContent="Couldn't read the vault. The public RPCs rate-limit under load — reload in a moment.";
+  }
+}
+
+function render(){
+  const n=nav;
+  $("ppsOut").innerHTML = Number(ethers.formatUnits(n.pps,AD)).toFixed(6)+'<small>USDC</small>';
+
+  const gain = Number(ethers.formatUnits(n.pps,AD)) - 1;
+  $("deltaOut").innerHTML = gain > 0.0000005
+    ? 'Up <b>'+(gain*100).toFixed(3)+'%</b> from the $1.00 launch price. Every reported dollar of revenue lifts this for all holders at once.'
+    : 'At the $1.00 launch price. It moves only when revenue is reported in — deposits and redemptions never change it.';
+
+  const lockPct = n.supply>0n ? Number(n.locked*10000n/n.supply)/100 : 100;
+  const circPct = 100-lockPct;
+  $("barLock").style.width=lockPct+"%";
+  $("barCirc").style.width=circPct+"%";
+  $("lockPct").textContent=lockPct.toFixed(1)+"%";
+  $("circPct").textContent=circPct.toFixed(1)+"%";
+
+  $("statusChip").innerHTML = !n.seeded
+    ? '<span class="chip shut">Not seeded</span>'
+    : n.paused ? '<span class="chip shut">Paused</span>' : '<span class="chip open">Open</span>';
+
+  $("taOut").textContent=fA(n.assets);
+  const room = n.cap===0n ? null : (n.assets>=n.cap ? 0n : n.cap-n.assets);
+  $("capOut").textContent = room===null ? "uncapped" : fA(room);
+  $("feeOut").textContent=(n.exit/100).toFixed(2)+"%";
+
+  $("myShares").textContent = me ? fS(myShares)+" MTYLD" : "—";
+  $("myValue").textContent  = me ? "—" : "—";
+  $("myUsdc").textContent   = me ? fA(myUsdc)+" USDC" : "—";
+  if(me && myShares>0n){
+    readV(c=>c.previewRedeem(myShares)).then(v=>{
+      $("myValue").textContent=fA(v)+" USDC net of fee";
+    }).catch(()=>{});
+  } else if(me){ $("myValue").textContent="0.00 USDC"; }
+
+  if(me){
+    $("depositPanel").classList.remove("hidden");
+    $("redeemPanel").classList.toggle("hidden", myShares===0n);
+    $("depHow").textContent = "You receive MTYLD shares at "+Number(ethers.formatUnits(n.pps,AD)).toFixed(6)+
+      " USDC each. Minimum deposit is "+fA(minDep)+" USDC. There's a "+(n.exit/100).toFixed(2)+
+      "% fee when you leave, not when you arrive — worth knowing before you size this.";
+    if(room!==null && room===0n){
+      $("depWhy").textContent="The vault is at its "+fA(n.cap)+" USDC cap. Nothing further can be deposited until the cap is raised or someone redeems.";
+      $("depWhy").className="why warn"; $("depBtn").disabled=true;
+    }
+    if(n.paused){
+      $("depWhy").textContent="Deposits and redemptions are paused by the operator. Existing positions are untouched.";
+      $("depWhy").className="why warn";
+    }
+  }
+  quoteDep(); quoteRed(); quoteRev();
+}
+
+/* ---------------- quotes ---------------- */
+async function quoteDep(){
+  const v=$("depAmt").value.trim();
+  if(!v||isNaN(v)||Number(v)<=0){ $("depQuote").textContent="Enter an amount to see what you'd receive."; $("depBtn").disabled=true; return; }
+  let assets; try{ assets=pA(v); }catch{ return; }
+  if(assets<minDep){
+    $("depQuote").innerHTML="Below the <b>"+fA(minDep)+" USDC</b> minimum deposit.";
+    $("depBtn").disabled=true; return;
+  }
+  if(assets>myUsdc){
+    $("depQuote").innerHTML="You hold <b>"+fA(myUsdc)+" USDC</b> — not enough, and gas comes out of the same balance.";
+    $("depBtn").disabled=true; return;
+  }
+  try{
+    const sh=await readV(c=>c.previewDeposit(assets));
+    const needsApproval = allowance < assets;
+    $("depQuote").innerHTML="You'd receive <b>"+fS(sh)+" MTYLD</b>. Redeeming immediately would return about <b>"+
+      fA(assets - (assets*BigInt(nav.exit)/10000n))+" USDC</b> after the exit fee.";
+    $("depBtn").disabled=nav.paused;
+    $("depBtn").textContent = needsApproval ? "Approve, then deposit" : "Deposit "+v+" USDC";
+    $("depWhy").textContent = needsApproval
+      ? "Two signatures: one lets the vault move your USDC, one performs the deposit. Both are needed the first time."
+      : "One signature. The vault is already approved for this amount.";
+    $("depWhy").className="why";
+  }catch(e){ console.error(e); }
+}
+
+async function quoteRed(){
+  const v=$("redAmt").value.trim();
+  if(!v||isNaN(v)||Number(v)<=0){ $("redQuote").textContent="Enter an amount to see what you'd receive."; $("redBtn").disabled=true; return; }
+  let sh; try{ sh=pS(v); }catch{ return; }
+  if(sh>myShares){
+    $("redQuote").innerHTML="You hold <b>"+fS(myShares)+" MTYLD</b>, which is less than that.";
+    $("redBtn").disabled=true; return;
+  }
+  try{
+    const out=await readV(c=>c.previewRedeem(sh));
+    const gross=sh*nav.pps/(10n**SD);
+    $("redQuote").innerHTML="You'd receive <b>"+fA(out)+" USDC</b>, after a "+(nav.exit/100).toFixed(2)+
+      "% exit fee of about "+fA(gross-out)+" USDC to Mechanical Temp.";
+    $("redBtn").disabled=nav.paused;
+    $("redBtn").textContent="Redeem "+v+" MTYLD";
+  }catch(e){ console.error(e); }
+}
+
+function quoteRev(){
+  if(!isOwner) return;
+  const v=$("revAmt").value.trim();
+  if(!v||isNaN(v)||Number(v)<=0){ $("revQuote").textContent="Enter an amount to see the effect on value per share."; return; }
+  try{
+    const add=pA(v);
+    const newPps=(nav.assets+add+1n)*(10n**SD)/(nav.supply+10n**6n);
+    $("revQuote").innerHTML="Value per share would move from <b>"+Number(ethers.formatUnits(nav.pps,AD)).toFixed(6)+
+      "</b> to <b>"+Number(ethers.formatUnits(newPps,AD)).toFixed(6)+" USDC</b>. No shares are minted, so nobody is diluted.";
+  }catch{}
+}
+
+["depAmt","redAmt","revAmt"].forEach(id=>$(id).addEventListener("input",()=>{
+  if(id==="depAmt") quoteDep(); else if(id==="redAmt") quoteRed(); else quoteRev();
+}));
+$("depMax").onclick=()=>{ $("depAmt").value=ethers.formatUnits(myUsdc,AD); quoteDep(); };
+$("redMax").onclick=()=>{ $("redAmt").value=ethers.formatUnits(myShares,SD); quoteRed(); };
+
+/* ---------------- connect ---------------- */
+$("connectBtn").onclick=()=>connect(false);
+(async function restore(){
+  if(!window.ethereum) return;
+  try{ const a=await window.ethereum.request({method:"eth_accounts"}); if(a&&a.length) await connect(true); }catch(_){}
+})();
+
+async function connect(silent){
+  if(!window.ethereum){
+    if(!silent){ $("mainWhy").textContent="No wallet in this browser. Open in your wallet's browser or install an extension."; $("mainWhy").className="why warn"; }
+    return;
+  }
+  try{
+    if(!silent) await window.ethereum.request({method:"eth_requestAccounts"});
+    const net=await window.ethereum.request({method:"eth_chainId"});
+    if(parseInt(net,16)!==CHAIN_ID){
+      try{ await window.ethereum.request({method:"wallet_switchEthereumChain",params:[{chainId:ARC_PARAMS.chainId}]}); }
+      catch(e){ if(e.code===4902) await window.ethereum.request({method:"wallet_addEthereumChain",params:[ARC_PARAMS]}); else throw e; }
+    }
+    const bp=new ethers.BrowserProvider(window.ethereum);
+    walletProvider=bp; signer=await bp.getSigner(); me=await signer.getAddress();
+    $("connectBtn").textContent=me.slice(0,6)+"…"+me.slice(-4)+" connected";
+    $("connectBtn").disabled=true;
+    try{
+      ownerAddr=await readV(c=>c.owner());
+      isOwner = ownerAddr.toLowerCase()===me.toLowerCase();
+      if(isOwner){ $("ownerPanel").classList.remove("hidden"); $("roleChip").innerHTML='<span class="role">Operator</span>'; }
+    }catch(_){}
+    $("roleHow").textContent = isOwner
+      ? "You operate this vault. Deposits and redemptions work the same for you as anyone; the operator panel below is additional."
+      : "MTYLD is a claim on Mechanical Temp's HVAC revenue, denominated in USDC. Deposit to receive shares; redeem to exit.";
+    $("mainWhy").textContent="";
+    await load();
+  }catch(e){
+    if(!silent){ $("mainWhy").textContent="Wallet didn't connect: "+(e.shortMessage||e.message); $("mainWhy").className="why warn"; }
+  }
+}
+
+/* ---------------- write ---------------- */
+function explain(e){
+  const m=(e.shortMessage||e.message||"");
+  if(m.includes("rejected")) return "You rejected the signature. Nothing changed.";
+  if(m.includes("BelowMinimum")) return "That's under the vault's minimum deposit.";
+  if(m.includes("CapExceeded")) return "That would push the vault past its deposit cap.";
+  if(m.includes("EnforcedPause")) return "The vault is paused right now.";
+  if(m.includes("NotSeeded")) return "The vault hasn't been seeded yet, so it can't take deposits.";
+  if(m.includes("FloorBreached")) return "That redemption would break the locked-share floor — it can't be allowed.";
+  return "Transaction failed: "+m;
+}
+
+$("depBtn").onclick=async()=>{
+  const b=$("depBtn"), label=b.textContent; b.disabled=true;
+  try{
+    const assets=pA($("depAmt").value.trim());
+    if(allowance<assets){
+      b.textContent="Approve in wallet…";
+      const u=new ethers.Contract(USDC,USDC_ABI,signer);
+      await (await u.approve(VAULT,assets)).wait();
+      allowance=assets;
+    }
+    b.textContent="Deposit in wallet…";
+    const v=new ethers.Contract(VAULT,VAULT_ABI,signer);
+    await (await v.deposit(assets,me)).wait();
+    $("depAmt").value=""; await load();
+    $("depWhy").textContent="Deposited. Your shares are shown above."; $("depWhy").className="why";
+  }catch(e){ $("depWhy").textContent=explain(e); $("depWhy").className="why warn"; }
+  finally{ b.disabled=false; b.textContent=label; }
+};
+
+$("redBtn").onclick=async()=>{
+  const b=$("redBtn"), label=b.textContent; b.disabled=true; b.textContent="Confirm in wallet…";
+  try{
+    const sh=pS($("redAmt").value.trim());
+    const v=new ethers.Contract(VAULT,VAULT_ABI,signer);
+    await (await v.redeem(sh,me,me)).wait();
+    $("redAmt").value=""; await load();
+    $("redWhy").textContent="Redeemed. USDC is back in your wallet."; $("redWhy").className="why";
+  }catch(e){ $("redWhy").textContent=explain(e); $("redWhy").className="why warn"; }
+  finally{ b.disabled=false; b.textContent=label; }
+};
+
+$("revBtn").onclick=async()=>{
+  const b=$("revBtn"); b.disabled=true;
+  try{
+    const amt=pA($("revAmt").value.trim());
+    if(allowance<amt){
+      b.textContent="Approve in wallet…";
+      const u=new ethers.Contract(USDC,USDC_ABI,signer);
+      await (await u.approve(VAULT,amt)).wait(); allowance=amt;
+    }
+    b.textContent="Report in wallet…";
+    const v=new ethers.Contract(VAULT,VAULT_ABI,signer);
+    await (await v.reportRevenue(amt)).wait();
+    $("revAmt").value=""; await load();
+    $("ownerWhy").textContent="Revenue reported. Value per share moved for every holder.";
+  }catch(e){ $("ownerWhy").textContent=explain(e); }
+  finally{ b.disabled=false; b.textContent="Report revenue"; }
+};
+
+$("feeBtn").onclick=async()=>{
+  const b=$("feeBtn"); b.disabled=true; b.textContent="Confirm…";
+  try{
+    const inB=parseInt($("feeIn").value.trim()||"0",10);
+    const outB=parseInt($("feeOutIn").value.trim()||"0",10);
+    const v=new ethers.Contract(VAULT,VAULT_ABI,signer);
+    await (await v.setFees(inB,outB)).wait(); await load();
+    $("ownerWhy").textContent="Fees updated to "+(inB/100).toFixed(2)+"% in / "+(outB/100).toFixed(2)+"% out.";
+  }catch(e){ $("ownerWhy").textContent=explain(e)+" (cap is 300 bps)"; }
+  finally{ b.disabled=false; b.textContent="Set fees"; }
+};
+
+$("pauseBtn").onclick=async()=>{
+  const b=$("pauseBtn"); b.disabled=true; b.textContent="Confirm…";
+  try{
+    const v=new ethers.Contract(VAULT,VAULT_ABI,signer);
+    await (await (nav.paused ? v.unpause() : v.pause())).wait(); await load();
+  }catch(e){ $("ownerWhy").textContent=explain(e); }
+  finally{ b.disabled=false; b.textContent=nav && nav.paused ? "Resume deposits" : "Pause deposits"; }
+};
+
+load();
+</script>
+</body>
+</html>
